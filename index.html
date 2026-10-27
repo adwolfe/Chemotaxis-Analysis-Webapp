@@ -4251,13 +4251,44 @@ function renderNav(A) {
       rows: [['Condition', 'Gradient', 'n', 'Mean', 'SD', 'SEM', 'Median'],
         ...groups.map(g => [g.name, noGradIds.has(g.id) ? 'no' : 'yes', g.values.length, S.mean(g.values), S.sd(g.values), S.sem(g.values), S.median(g.values)])] }; };
 
-  /* --- reorientation rate vs bearing (Kramer et al. 2026) --- */
-  const rateSeries = withNav.map(({ cd, ws }) => {
-    const nb = ws[0].nav.rateBins.length, bins = [];
-    for (let k = 0; k < nb; k++) { const v = ws.map(w => w.nav.rateBins[k].mean).filter(isFinite);
-      const b0 = ws[0].nav.rateBins[k];
-      bins.push({ x0: b0.x0, x1: b0.x1, mid: b0.mid, values: v, mean: S.mean(v), sem: S.sem(v), n: v.length }); }
-    return { name: cd.name, color: cd.color, bins, dash: cd.grad === 'no' ? '5,4' : null }; });
+/* Worm Track Analyzer — local drop-in replacement for the block at index.html
+   renderNav(), immediately below:
+     /* --- reorientation rate vs bearing (Kramer et al. 2026) --- * /
+   Replace the existing `const rateSeries = ...` block, but retain the
+   subsequent grid.appendChild(figCard('bearing_turn_rate', ...)).
+
+   This takes the per-worm counts and time exposures ALREADY computed by
+   addNav(), aggregates them within independent plates/files, and then
+   plots the mean and SEM of plate rates rather than unweighted worm rates.
+   No change to Method B detection, event attribution, bin edges or settings.
+*/
+const rateSeries = withNav.map(({ cd, ws }) => {
+  const nb = ws[0].nav.rateBins.length, bins = [];
+  const byPlate = new Map();
+  ws.forEach(w => {
+    const key = w.fileId || w.file;
+    if (!byPlate.has(key))
+      byPlate.set(key, Array.from({ length: nb }, () => ({ count: 0, seconds: 0 })));
+    const exposure = byPlate.get(key);
+    for (let k = 0; k < nb; k++) {
+      const b = w.nav.rateBins[k];
+      exposure[k].count += b.n;       // detected Method B events
+      exposure[k].seconds += b.time; // observed seconds in that bearing bin
+    }
+  });
+  for (let k = 0; k < nb; k++) {
+    const b0 = ws[0].nav.rateBins[k];
+    const v = [...byPlate.values()].map(a => {
+      const d = a[k];
+      return d.seconds > 0 ? rateOf(d.count, d.seconds, c) : NaN;
+    }).filter(Number.isFinite);
+    bins.push({ x0: b0.x0, x1: b0.x1, mid: b0.mid,
+      values: v, mean: S.mean(v), sem: S.sem(v), n: v.length });
+  }
+  return { name: cd.name, color: cd.color, bins,
+    dash: cd.grad === 'no' ? '5,4' : null };
+});
+
   grid.appendChild(figCard('bearing_turn_rate',
     timeCourseFig('Reorientation rate vs bearing to the source', rateSeries, 'bearing to source, cos θ  (+1 = heading at it)', rateLabel(c), 'line', null),
     'Kramer et al. 2026: bearing is cos θ, the angle between the direction of travel and the direction to the odour. A downward slope means the animal suppresses turning while it is heading the right way — the biased random walk. Dashed lines are no-gradient controls and should be flat.',
