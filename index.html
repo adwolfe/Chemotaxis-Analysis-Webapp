@@ -230,12 +230,16 @@ td.n,th.n{text-align:right;font-variant-numeric:tabular-nums;font-family:var(--m
                   <option value="sg">Savitzky–Golay</option>
                   <option value="none">None</option>
                 </select></div>
-              <div style="flex:1"><label class="f">Window <span class="hint">frames</span></label>
+              <div style="flex:1"><label class="f">Window <span class="hint">frames (legacy)</span></label>
                 <input type="number" id="smoothWin" value="15" step="2" min="1"></div>
               <div style="flex:.9" id="sgOrderBox"><label class="f">Order</label>
                 <input type="number" id="sgOrder" value="2" step="1" min="0" max="6"></div>
             </div>
           </div>
+        </div>
+        <div class="row" style="margin-top:8px">
+          <label class="f">Smoothing units <select id="smoothUnits"><option value="frames">Frames (legacy)</option><option value="seconds">Seconds</option></select></label>
+          <label class="f">Window (s) <input id="smoothSeconds" type="number" value="0.5" min="0" step="any"></label>
         </div>
         <div class="row" style="margin-top:12px;border-top:1px solid var(--line);padding-top:11px">
           <div style="min-width:165px"><label class="f">Show reorientations</label>
@@ -451,7 +455,7 @@ td.n,th.n{text-align:right;font-variant-numeric:tabular-nums;font-family:var(--m
         <div style="min-width:170px" id="navDirBox"><label class="f">Gradient direction <span class="hint">deg, 0 = +x, CCW</span></label>
           <input type="number" id="navDir" value="0" step="any"></div>
         <div style="min-width:140px"><label class="f">Bearing bins</label>
-          <input type="number" id="navBins" value="8" step="1" min="3" max="24"></div>
+          <input type="number" id="navBins" value="5" step="1" min="3" max="24"></div>
         <div style="min-width:140px"><label class="f">Shuffle iterations</label>
           <input type="number" id="shuffleN" value="500" step="100" min="20" max="5000"></div>
         <div style="min-width:250px"><label class="f">Reference for a no-gradient condition</label>
@@ -463,6 +467,24 @@ td.n,th.n{text-align:right;font-variant-numeric:tabular-nums;font-family:var(--m
       <div id="srcTable" style="margin-top:12px"></div>
     </div>
     <div class="card">
+      <h3>Bearing assignment and exposure</h3>
+      <div class="grid g3">
+        <label class="f">Heading estimator<select id="bearingEstimator"><option value="regression">Pre-turn linear regression</option><option value="legacy">Legacy adjacent displacement</option></select></label>
+        <label class="f">Exposure denominator<select id="bearingExposure"><option value="eligible">Eligible runs, excluding turns and refractory time</option><option value="legacy">Legacy all observation time</option></select></label>
+        <label class="f">Curve aggregation<select id="bearingAggregation"><option value="plate">Mean ± SEM across plates</option><option value="pooled">Pooled counts / time (diagnostic)</option><option value="worm">Unweighted worm rates (legacy diagnostic)</option></select></label>
+        <label class="f">Pre-turn window (s)<input id="bearingWindow" type="number" value="3" min="0.01" step="any"></label>
+        <label class="f">Exclusion before onset (s)<input id="bearingExclude" type="number" value="1" min="0" step="any"></label>
+        <label class="f">Quality distance units<select id="bearingUnits"><option value="px">Pixels (speed in px/s)</option><option value="mm">Millimetres (speed in mm/s; calibration required)</option></select></label>
+        <label class="f">Minimum net displacement<input id="bearingMinDisp" type="number" value="2" min="0" step="any"></label>
+        <label class="f">Minimum fitted speed<input id="bearingMinSpeed" type="number" value="0" min="0" step="any"></label>
+        <label class="f">Minimum straightness (net / path)<input id="bearingStraight" type="number" value="0.7" min="0" max="1" step="0.05"></label>
+        <label class="f">Minimum valid observations<input id="bearingMinObs" type="number" value="3" min="3" step="1"></label>
+        <label class="f">Minimum window coverage (fraction)<input id="bearingCoverage" type="number" value="0.8" min="0" max="1" step="0.05"></label>
+        <label class="f">Maximum tracking / sampling gap (s)<input id="bearingMaxGap" type="number" value="1.5" min="0.01" step="any"></label>
+      </div>
+      <div class="note">The revised curve always uses Method B, independently of the primary detector elsewhere. Onset is the first threshold crossing in the detected event span, an estimate rather than a biological annotation. Regression uses unsmoothed, quality-filtered positions on the existing resampled timestamps in [onset − exclusion − window, onset − exclusion], without inventing subsecond samples. The source direction is evaluated at the mean position in that window. Identical quality and run-history rules apply to events and exposure. Rejected bearings never remove detected events. Thresholds are exploratory settings, not validated biological cutoffs.</div>
+    </div>
+    <div class="card">
       <h3>Weathervaning</h3>
       <div class="row">
         <div style="min-width:150px"><label class="f">Bearing bins</label>
@@ -472,6 +494,11 @@ td.n,th.n{text-align:right;font-variant-numeric:tabular-nums;font-family:var(--m
       </div>
     </div>
     <div id="navFigs"><div class="empty">Load data and mark a source first.</div></div>
+    <div class="card"><h3>Bearing diagnostics</h3><div id="bearingDiagnostics"></div></div>
+    <div class="card"><h3>Robustness validation</h3>
+      <p class="note">Run one-factor-at-a-time sweeps around the current settings and a 7.5 → 3.75 fps comparison. Each result retains counts and exposure; settings and results are included in CSV exports. Runs use loaded tracks and do not alter the live settings. A sweep is a sensitivity diagnostic, not a significance test.</p>
+      <button class="btn" id="bearingValidate">Run sensitivity and frame-rate checks</button><div id="bearingValidation" class="scroll"></div>
+    </div>
     <div class="card"><h3>Statistics</h3><div id="navStats"></div></div>
     <div class="card"><h3>Per-replicate values</h3><div class="scroll" id="navTable"></div></div>
   </section>
@@ -796,6 +823,8 @@ td.n,th.n{text-align:right;font-variant-numeric:tabular-nums;font-family:var(--m
           </select>
         </div>
       </div>
+      <label class="f">Calibration source<select id="calibrationMode"><option value="file">Per-file metadata / overrides; global values are fallbacks</option><option value="global">Global values only (legacy reproduction)</option></select></label>
+      <div class="note">Set each plate’s frame rate, scale, plate ID and experimental day on Data &amp; groups. A blank override uses that file’s metadata, then the global fallback.</div>
       <div class="note" id="unitNote"></div>
     </div>
 
@@ -1451,7 +1480,7 @@ async function readWorkbook(file) {
 
 /* ---- csv ---- */
 function toCSV(rows) { const esc = v => {
-  if (typeof v === 'number') v = isFinite(v) ? String(+v.toPrecision(8)) : '';
+  if (typeof v === 'number') v = isFinite(v) ? String(v) : '';
   v = v == null ? '' : String(v);
   if (v === 'NaN' || v === 'Infinity' || v === '-Infinity') v = '';
   return /[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; };
@@ -1480,7 +1509,14 @@ function cfg() {
   const raw = (id) => { const v = parseFloat($(id).value); return isFinite(v) && v > 0 ? v : null; };
   const fps = raw('fps'), pxmm = raw('pxmm');
   return {
-    fps, pxmm,
+    fps, pxmm, calibrationMode: $('calibrationMode').value,
+    smoothUnits: $('smoothUnits').value, smoothSeconds: Math.max(0, num('smoothSeconds', .5)),
+    bearingEstimator: $('bearingEstimator').value, bearingExposure: $('bearingExposure').value,
+    bearingAggregation: $('bearingAggregation').value, bearingUnits: $('bearingUnits').value,
+    bearingWindow: Math.max(.01, num('bearingWindow', 3)), bearingExclude: Math.max(0, num('bearingExclude', 1)),
+    bearingMinDisp: Math.max(0, num('bearingMinDisp', 2)), bearingMinSpeed: Math.max(0, num('bearingMinSpeed', 0)),
+    bearingStraight: clampNum(num('bearingStraight', .7), 0, 1), bearingMinObs: Math.max(3, Math.round(num('bearingMinObs', 3))),
+    bearingCoverage: clampNum(num('bearingCoverage', .8), 0, 1), bearingMaxGap: Math.max(.01, num('bearingMaxGap', 1.5)),
     hasTime: !!fps, hasSpace: !!pxmm,
     F: fps || 1, K: pxmm || 1,
     tUnit: fps ? 's' : 'frames', sUnit: pxmm ? 'mm' : 'px',
@@ -1516,7 +1552,7 @@ function cfg() {
     iriCensor: $('iriCensor') ? $('iriCensor').checked : true,
     navMode: $('navMode') ? $('navMode').value : 'point',
     navDir: num('navDir', 0),
-    navBins: Math.max(3, Math.round(num('navBins', 8))),
+    navBins: Math.max(3, Math.round(num('navBins', 5))),
     wvBins: Math.max(3, Math.round(num('wvBins', 12))),
     wvLimit: num('wvLimit', 180),
     shuffleN: Math.max(20, Math.round(num('shuffleN', 500))),
@@ -1778,6 +1814,7 @@ function detectB(ts, dTheta, thr, refrac) {
 function analyzeWorm(w, c) {
   const qt = qcTrack(w, c);
   const res = { id: w.id, ok: false, reason: '' };
+  if (c.smoothUnits === 'seconds' && !c.hasTime) { res.reason = 'smoothing in seconds requires fps'; return res; }
   if (qt.f.length < 3) { res.reason = 'too few valid frames'; return res; }
   if (c.minFrames > 0 && (qt.f[qt.f.length - 1] - qt.f[0]) < c.minFrames) { res.reason = 'track shorter than minimum'; return res; }
   const sm = smoothTrack(qt, c);
@@ -1889,7 +1926,8 @@ function analyzeWorm(w, c) {
     for (let i = 0; i < n; i++) if (xs[i] != null) { if (a === null) a = i; b = i; }
     return (a === null || b === null) ? 0 : Math.hypot(xs[b] - xs[a], ys[b] - ys[a]); })();
 
-  Object.assign(res, { ok: true, ts, xs, ys, n, dt, evA, evB, evC, nRev, nOmega, bendRatio,
+  const headingTrack = resample(qt, c); // Independent heading input: no centred smoothing can leak future turn positions.
+  Object.assign(res, { bearingXs: headingTrack.xs, bearingYs: headingTrack.ys, qcTimes: qt.f.map(f => f / c.F), calibration: c, ok: true, ts, xs, ys, n, dt, evA, evB, evC, nRev, nOmega, bendRatio,
     hasCL: !!(w.cl && w.cl.f.length > 5), bodyLen: w.cl ? w.cl.bodyLen : null, omega, dTheta, sm,
     speedSeries: speed, path: cumPath[n - 1], netDisp: netD, durT, validT, inTurn, dist, head,
     coverage: n ? inTurn.filter(Boolean).length / n : 0,
@@ -1972,7 +2010,202 @@ function addNav(w, c, geom) {
     wvBins, wvSlope: wvFit.slope, wvR2: wvFit.r2,
     dBearing: dB, meanDBearing: S.mean(dB), shuffle,
     meanCos: S.mean(cosB.filter(v => v != null)) };
+  w.nav.geometry = geom;
+  w.nav.legacyBearing = analyzeBearing(w, c, geom, 'legacy', 'legacy', ev);
+  w.nav.legacyMethodB = c.primary === 'B' ? w.nav.legacyBearing : analyzeBearing(w, c, geom, 'legacy', 'legacy', w.evB);
+  w.nav.revisedBearing = analyzeBearing(w, c, geom, c.bearingEstimator, c.bearingExposure, w.evB);
+
 }
+/* Bearing analysis is downstream of detection. None of these functions mutate events. */
+function fileMetadata(f) {
+  return { meta: f.meta || {}, fpsOverride: f.fpsOverride || null, pxmmOverride: f.pxmmOverride || null,
+    plateId: f.plateId || f.id, day: f.day || '' };
+}
+function configForFile(f, c) {
+  const useFile = c.calibrationMode !== 'global';
+  const positive = v => Number.isFinite(Number(v)) && Number(v)>0 ? Number(v) : null;
+  const fps = (useFile && (positive(f.fpsOverride) || positive(f.meta?.fps))) || positive(c.fps);
+  const pxmm = (useFile && (positive(f.pxmmOverride) || positive(f.meta?.pxmm))) || positive(c.pxmm);
+  let win = c.smoothWin;
+  if (c.smoothUnits === 'seconds' && fps) win = 2 * Math.max(0, Math.round(c.smoothSeconds * fps / 2)) + 1; // Full first-to-last observation span.
+  return { ...c, fps, pxmm, F: fps || 1, K: pxmm || 1, hasTime: !!fps, hasSpace: !!pxmm,
+    tUnit: fps ? 's' : 'frames', sUnit: pxmm ? 'mm' : 'px', smoothWin: win };
+}
+function lowerTime(ts, t) {
+  let a = 0, b = ts.length;
+  while (a < b) { const m = (a + b) >> 1; if (ts[m] < t - 1e-9) a = m + 1; else b = m; }
+  return a;
+}
+function bearingAt(h, x, y, geom) {
+  if (![h, x, y].every(Number.isFinite)) return null;
+  if (geom.mode !== 'dir' && Math.hypot(geom.x - x, geom.y - y) < 1e-12) return null;
+  const direction = geom.mode === 'dir' ? geom.dir : Math.atan2(geom.y - y, geom.x - x) * 180 / Math.PI;
+  return Math.cos(wrapDeg(direction - h) * Math.PI / 180);
+}
+function bearingBlocks(w, events, c) {
+  return events.map((e, id) => ({ id, start: w.ts[e.span[0]],
+    // The full threshold span is turning; refractory is measured from the detector peak.
+    turnEnd: w.ts[Math.min(w.n - 1, e.span[1] + 1)],
+    end: Math.max(w.ts[Math.min(w.n - 1, e.span[1] + 1)], e.t + Math.max(0, c.refrac)) }));
+}
+function blockedAt(t, blocks, ignore = -1) {
+  return blocks.some(b => b.id !== ignore && t >= b.start - 1e-9 && t < b.end - 1e-9);
+}
+function estimatePreBearing(w, c, geom, anchor, estimator, blocks = [], ownEvent = -1) {
+  const q = { anchor, valid: false, reasons: [], cos: null, heading: null, displacement: null, speed: null,
+    straightness: null, observations: 0, coverage: 0, maxGap: null, start: null, end: null, x: null, y: null, vx: null, vy: null };
+  if (estimator === 'legacy') {
+    // Exact original interval index for an event; for exposure use its current interval.
+    const i = ownEvent >= 0 ? Math.max(0, lowerTime(w.ts, anchor) - 1) : Math.min(w.n - 2, lowerTime(w.ts, anchor));
+    q.start = w.ts[i]; q.end = w.ts[i + 1]; q.observations = 2;
+    q.heading = w.head[i]; q.x = w.xs[i]; q.y = w.ys[i];
+    q.cos = q.heading == null ? null : bearingAt(q.heading, q.x, q.y, geom);
+    if (q.heading != null && q.x != null) { const dir = geom.mode === 'dir' ? geom.dir : Math.atan2(geom.y-q.y, geom.x-q.x)*180/Math.PI; q.cos = Math.cos(wrapDeg(dir-q.heading)*Math.PI/180); }
+    if (q.cos == null) q.reasons.push('undefined_heading');
+    q.valid = q.cos != null; return q;
+  }
+  if (!c.hasTime) q.reasons.push('missing_fps');
+  if (c.bearingUnits === 'mm' && !c.hasSpace) q.reasons.push('missing_spatial_calibration');
+  const end = anchor - c.bearingExclude, start = end - c.bearingWindow;
+  q.requestStart = start; q.requestEnd = end;
+  const first = lowerTime(w.ts, start), last = lowerTime(w.ts, end + 2e-9);
+  const pts = [], bx = w.bearingXs || w.xs, by = w.bearingYs || w.ys;
+  for (let i = first; i < last; i++) if (Number.isFinite(bx[i]) && Number.isFinite(by[i])) pts.push([w.ts[i], bx[i], by[i]]);
+  q.observations = pts.length;
+  if (pts.length < c.bearingMinObs) q.reasons.push('insufficient_observations');
+  if (start < w.ts[0] - 1e-9 || end > w.ts[w.n - 1] + 1e-9) q.reasons.push('incomplete_window');
+  if (pts.length < 2) return q;
+  q.start = pts[0][0]; q.end = pts[pts.length - 1][0];
+  q.coverage = (q.end - q.start) / c.bearingWindow;
+  if (q.coverage + 1e-9 < c.bearingCoverage) q.reasons.push('insufficient_coverage');
+  const sampleGaps = pts.slice(1).map((p, i) => p[0] - pts[i][0]);
+  // Check original retained observations as well, so interpolation cannot hide a tracking gap.
+  const qt = w.qcTimes || w.ts, qa = Math.max(0, lowerTime(qt, start) - 1), qb = Math.min(qt.length - 1, lowerTime(qt, end));
+  let gap = Math.max(...sampleGaps, pts[0][0] - start, end - pts[pts.length - 1][0]);
+  for (let i = qa; i < qb; i++) if (qt[i] < end && qt[i + 1] > start) gap = Math.max(gap, qt[i + 1] - qt[i]);
+  q.maxGap = gap;
+  if (gap > c.bearingMaxGap + 1e-9) q.reasons.push('tracking_gap');
+  // Previous turns/refractory time may not enter the heading window. The event being
+  // measured begins at anchor, so only the preceding history is considered.
+  if (blocks.some(b => b.id !== ownEvent && start < b.end - 1e-9 && end >= b.start - 1e-9)) q.reasons.push('turn_in_heading_window');
+  const mt = S.mean(pts.map(p => p[0])), mx = S.mean(pts.map(p => p[1])), my = S.mean(pts.map(p => p[2]));
+  let tt = 0, tx = 0, ty = 0, path = 0;
+  pts.forEach((p, i) => { const d = p[0] - mt; tt += d * d; tx += d * (p[1] - mx); ty += d * (p[2] - my);
+    if (i) path += Math.hypot(p[1] - pts[i - 1][1], p[2] - pts[i - 1][2]); });
+  // Coordinate arrays use mm if calibrated. User thresholds remain in explicit units.
+  const scale = c.bearingUnits === 'px' ? c.K : 1;
+  const net = Math.hypot(pts[pts.length - 1][1] - pts[0][1], pts[pts.length - 1][2] - pts[0][2]);
+  q.displacement = net * scale; q.straightness = path > 0 ? Math.min(1, net / path) : 0;
+  q.vx = tt > 0 ? tx / tt : 0; q.vy = tt > 0 ? ty / tt : 0;
+  q.speed = Math.hypot(q.vx, q.vy) * scale; q.x = mx; q.y = my;
+  if (q.displacement + 1e-9 < c.bearingMinDisp) q.reasons.push('low_displacement');
+  if (q.speed + 1e-9 < c.bearingMinSpeed) q.reasons.push('low_speed');
+  if (q.straightness + 1e-9 < c.bearingStraight) q.reasons.push('low_straightness');
+  if (!(q.speed > 1e-12)) q.reasons.push('undefined_heading');
+  else { q.heading = Math.atan2(q.vy, q.vx) * 180 / Math.PI; q.cos = bearingAt(q.heading, mx, my, geom);
+    if (q.cos == null) q.reasons.push('undefined_source_direction'); }
+  q.valid = q.reasons.length === 0;
+  return q;
+}
+function analyzeBearing(w, c, geom, estimator = 'regression', exposureMode = 'eligible', events = w.evB) {
+  const nb = c.navBins, bins = Array.from({ length: nb }, (_, k) => ({ x0: -1 + 2*k/nb, x1: -1 + 2*(k+1)/nb,
+    mid: -1 + (2*k+1)/nb, n: 0, time: 0, mean: NaN }));
+  const binOf = v => clampNum(Math.floor((v + 1) / 2 * nb), 0, nb - 1);
+  const blocks = exposureMode === 'eligible' ? bearingBlocks(w, events, c) : [];
+  const eventRows = events.map((e, id) => {
+    const anchor = w.ts[e.span[0]], q = estimatePreBearing(w, c, geom, anchor, estimator, blocks, id);
+    if (blockedAt(anchor, blocks, id)) { q.reasons.push('onset_not_eligible'); q.valid = false; }
+    const bin = q.valid ? binOf(q.cos) : null;
+    if (bin != null) bins[bin].n++;
+    return { id, event: e, onset: anchor, ...q, bin };
+  });
+  const exposureRows = [];
+  for (let i = 0; i < w.n - 1; i++) {
+    const a = w.ts[i], b = w.ts[i+1];
+    // Split intervals at turn/refractory boundaries; never charge turning time to runs.
+    const cuts = [a, b, ...blocks.flatMap(d => [d.start, d.end]).filter(t => t > a && t < b)].sort((x,y) => x-y);
+    for (let j = 0; j < cuts.length - 1; j++) {
+      const start = cuts[j], end = cuts[j+1]; if (end <= start) continue;
+      const q = estimatePreBearing(w, c, geom, start, estimator, blocks);
+      if (blockedAt(start, blocks)) { q.reasons.push('turn_or_refractory'); q.valid = false; }
+      if (w.xs[i] == null || w.xs[i+1] == null) { q.reasons.push('missing_interval'); q.valid = false; }
+      if (estimator !== 'legacy' && w.qcTimes) {
+        const qa = Math.max(0, lowerTime(w.qcTimes, start)-1), qb = Math.min(w.qcTimes.length-1, lowerTime(w.qcTimes, end));
+        for (let k=qa;k<qb;k++) if (w.qcTimes[k] < end && w.qcTimes[k+1] > start && w.qcTimes[k+1]-w.qcTimes[k] > c.bearingMaxGap+1e-9) { q.reasons.push('tracking_gap_in_interval'); q.valid=false; break; }
+      }
+      const bin = q.valid ? binOf(q.cos) : null;
+      const duration = estimator === 'legacy' && exposureMode === 'legacy' ? w.dt : end-start;
+      if (bin != null) bins[bin].time += duration;
+      exposureRows.push({ intervalStart: start, intervalEnd: end, duration, ...q, bin });
+    }
+  }
+  bins.forEach(b => b.mean = b.time > 0 ? rateOf(b.n, b.time, c) : NaN);
+  const supported = bins.filter(b => b.time > 0);
+  const fit = linFit(supported.map(b => b.mid), supported.map(b => b.mean));
+  return { estimator, exposureMode, bins, events: eventRows, exposure: exposureRows, blocks, fit,
+    total: events.length, assigned: eventRows.filter(e => e.valid).length };
+}
+function bearingPlateSummary(ws, c, field = 'revisedBearing') {
+  const byPlate = new Map();
+  ws.forEach(w => {
+    const data = w.nav?.[field]; if (!data) return;
+    const id = w.plateId || w.fileId, key = JSON.stringify([w.day || '', id]);
+    if (!byPlate.has(key)) byPlate.set(key, { id, day: w.day || '', days: new Set(), files: new Set(),
+      total: 0, assigned: 0, bins: data.bins.map(b => ({ ...b, n: 0, time: 0, worms: new Set() })) });
+    const p = byPlate.get(key); p.days.add(w.day || ''); p.files.add(w.fileId); p.total += data.total; p.assigned += data.assigned;
+    data.bins.forEach((b,k) => { p.bins[k].n += b.n; p.bins[k].time += b.time;
+      if (b.time > 0) p.bins[k].worms.add(w.fileId + ':' + w.id); });
+  });
+  return [...byPlate.values()].map(p => {
+    p.dayConflict = p.days.size > 1; if (p.dayConflict) p.day = '';
+    p.bins.forEach(b => { b.mean = b.time > 0 ? rateOf(b.n, b.time, c) : NaN; b.worms = b.worms.size; });
+    const b = p.bins.filter(b => b.time > 0);
+    p.fit = linFit(b.map(b => b.mid), b.map(b => b.mean));
+    return p;
+  });
+}
+function bearingSeries(withNav, c, field = 'revisedBearing', aggregation = c.bearingAggregation) {
+  return withNav.map(({cd, ws}) => {
+    const plates = bearingPlateSummary(ws, c, field);
+    const bins = ws[0].nav[field].bins.map((b,k) => {
+      const ps = plates.map(p => p.bins[k]).filter(b => b.time > 0);
+      const count = plates.reduce((s,p) => s+p.bins[k].n, 0), time = ps.reduce((s,b) => s+b.time, 0);
+      const values = aggregation === 'worm' ? ws.map(w => w.nav[field].bins[k].mean).filter(Number.isFinite) : ps.map(b => b.mean);
+      return { ...b, mean: aggregation === 'pooled' ? (time > 0 ? rateOf(count,time,c) : NaN) : S.mean(values),
+        sem: aggregation === 'pooled' ? NaN : S.sem(values), values, n: aggregation === 'pooled' ? (time > 0 ? 1 : 0) : values.length,
+        count, time, worms: ps.reduce((s,b) => s+b.worms, 0), plates: ps.length };
+    });
+    return { name: cd.name, color: cd.color, bins, dash: cd.grad === 'no' ? '5,4' : null };
+  });
+}
+/* Plate slopes ~ genotype + experimental day. Treatment-coded OLS with HC1
+   heteroskedasticity-robust covariance; no worm is an independent replicate here. */
+function comparePlateSlopes(groups) {
+  const ps = groups.flatMap(g => g.plates.filter(p => Number.isFinite(p.fit.slope)).map(p => ({ ...p, group: g.name })));
+  if (groups.length < 2) return { error: 'Load at least two conditions with plate slopes.' };
+  if (!ps.length || ps.some(p => !p.day || p.dayConflict)) return { error: 'Day-adjusted comparison requires one unambiguous experimental-day ID for every plate with a slope.' };
+  const names = [...new Set(ps.map(p => p.group))], days = [...new Set(ps.map(p => p.day))];
+  if (names.length < 2) return { error: 'At least two conditions need estimable plate slopes.' };
+  const labels = ['Intercept', ...names.slice(1).map(n => n+' − '+names[0]), ...days.slice(1).map(d => 'Day '+d+' − '+days[0])];
+  const X = ps.map(p => [1, ...names.slice(1).map(n => +(p.group===n)), ...days.slice(1).map(d => +(p.day===d))]);
+  const n = X.length, k = labels.length, df = n-k;
+  if (df < 1) return { error: 'Insufficient independent plates for genotype and day effects.' };
+  const M = Array.from({ length:k }, (_,i) => Array.from({ length:2*k }, (_,j) => j<k ? X.reduce((s,x)=>s+x[i]*x[j],0) : +(j-k===i)));
+  for (let i=0;i<k;i++) { let pivot=i; for(let r=i+1;r<k;r++) if(Math.abs(M[r][i])>Math.abs(M[pivot][i])) pivot=r;
+    if(Math.abs(M[pivot][i])<1e-10) return {error:'Genotype and day are confounded (rank-deficient design); no adjusted test is reported.'};
+    [M[i],M[pivot]]=[M[pivot],M[i]]; const v=M[i][i]; M[i]=M[i].map(x=>x/v);
+    for(let r=0;r<k;r++) if(r!==i) { const v=M[r][i]; M[r]=M[r].map((x,j)=>x-v*M[i][j]); }
+  }
+  const inv=M.map(r=>r.slice(k)), xy=labels.map((_,i)=>X.reduce((s,x,j)=>s+x[i]*ps[j].fit.slope,0));
+  const beta=inv.map(r=>r.reduce((s,v,i)=>s+v*xy[i],0));
+  const residual=X.map((x,j)=>ps[j].fit.slope-x.reduce((s,v,i)=>s+v*beta[i],0));
+  const meat=labels.map((_,i)=>labels.map((_,j)=>X.reduce((s,x,r)=>s+x[i]*x[j]*residual[r]**2,0)*n/df));
+  const effects=labels.map((label,i)=>{ let variance=0; for(let a=0;a<k;a++) for(let b=0;b<k;b++) variance+=inv[i][a]*meat[a][b]*inv[b][i];
+    const se=Math.sqrt(Math.max(0,variance)), t=se>1e-12?beta[i]/se:NaN;
+    return {label, estimate:beta[i], se, t, df, p:S.tPval(t,df)}; });
+  return {effects, n, days:days.length, reference:names[0]};
+}
+
 function linFit(x, y) {
   const n = x.length; if (n < 3) return { slope: NaN, intercept: NaN, r2: NaN };
   const mx = S.mean(x), my = S.mean(y);
@@ -2260,12 +2493,16 @@ function geomFor(f, cd, c) {
 }
 function runAnalysis() {
   const c = cfg(), sc = saltCfg();
+  const fileConfigs = ST.conds.flatMap(cd=>cd.files.map(f=>configForFile(f,c)));
+  c.calibrationConflict = new Set(fileConfigs.map(fc=>fc.hasTime)).size>1 || new Set(fileConfigs.map(fc=>fc.hasSpace)).size>1;
+  if (fileConfigs.length && fileConfigs.every(fc=>fc.hasTime)) { c.hasTime=true; c.tUnit='s'; }
+  if (fileConfigs.length && fileConfigs.every(fc=>fc.hasSpace)) { c.hasSpace=true; c.sUnit='mm'; }
   const conds = ST.conds.map(cd => {
     const worms = [];
     cd.files.forEach(f => f.worms.forEach(w => {
-      const r = analyzeWorm(w, c);
-      r.cond = cd.name; r.condId = cd.id; r.file = f.name; r.fileId = f.id; r.color = cd.color;
-      if (r.ok) { const g = geomFor(f, cd, c); addNav(r, c, g); addStates(r, c); addMSD(r, c); addSalt(r, c, sc, g); }
+      const fc = configForFile(f, c), r = analyzeWorm(w, fc);
+      r.cond = cd.name; r.condId = cd.id; r.file = f.name; r.fileId = f.id; r.color = cd.color; r.plateId = f.plateId || f.id; r.day = f.day || "";
+      if (r.ok) { const g = geomFor(f, cd, fc); addNav(r, fc, g); addStates(r, fc); addMSD(r, fc); addSalt(r, fc, sc, g); }
       worms.push(r); }));
     return { ...cd, worms, used: worms.filter(w => w.ok) };
   });
@@ -3219,7 +3456,16 @@ function renderConds() {
         x.onclick = () => { cd.files.splice(fi, 1); renderConds(); schedule(); };
         ul.appendChild(el('li', {}, [el('span', { class: 'nm' }, f.name),
           el('span', { class: 'meta' }, `${nw} worm${nw === 1 ? '' : 's'} · ${f.nRows.toLocaleString()} rows`), x])); });
-      box.appendChild(ul); }
+      box.appendChild(ul);
+      const metaTable = el('table');
+      metaTable.innerHTML = '<thead><tr><th>File</th><th>Plate ID (shared ID pools files)</th><th>Experimental day</th><th>FPS override</th><th>px/mm override</th></tr></thead>';
+      cd.files.forEach(f => { const tr = el('tr'); tr.appendChild(el('td', {}, f.name));
+        [['plateId','text',f.id],['day','text','unknown'],['fpsOverride','number',f.meta?.fps || 'global fallback'],['pxmmOverride','number',f.meta?.pxmm || 'global fallback']].forEach(([k,type,hint]) => {
+          const input = el('input', { type, placeholder: String(hint), style: 'width:135px', step: 'any' }); input.value = f[k] || '';
+          input.onchange = () => { f[k] = type === 'number' ? (Number(input.value) > 0 ? Number(input.value) : null) : input.value.trim(); ST.validation = null; schedule(); };
+          const td = el('td'); td.appendChild(input); tr.appendChild(td);
+        }); metaTable.appendChild(tr);
+      }); box.appendChild(el('div', { class: 'scroll' }, metaTable)); }
     if (cd.extras && cd.extras.length) {
       const x = el('button', { class: 'x' }, '×');
       x.onclick = () => { cd.extras = []; renderConds(); };
@@ -3233,7 +3479,7 @@ async function filesFromDrop(dt) {
   const out = [];
   if (dt.items && dt.items[0] && dt.items[0].webkitGetAsEntry) {
     const roots = [...dt.items].map(i => i.webkitGetAsEntry()).filter(Boolean);
-    const walk = async entry => { if (entry.isFile) { await new Promise(r => entry.file(f => { out.push(f); r(); }, r)); }
+    const walk = async entry => { if (entry.isFile) { await new Promise(r => entry.file(f => { Object.defineProperty(f, 'relativeName', {value:entry.fullPath.replace(/^\//,'')}); out.push(f); r(); }, r)); }
       else if (entry.isDirectory) { const rd = entry.createReader();
         while (true) { const batch = await new Promise(r => rd.readEntries(r, () => r([])));
           if (!batch.length) break;
@@ -3246,28 +3492,32 @@ async function loadFiles(cd, files) {
   const zip = files.find(f => /\.zip$/i.test(f.name));
   if (zip) { await openProjectZip(zip); return; }
   const many = files.length > 1;
-  const problems = []; let folderMeta = null; let loaded = 0;
+  const problems = [], folderMetas = new Map(), added = []; let loaded = 0;
   for (const f of files) {
-    const nm = f.webkitRelativePath || f.name;
+    const nm = f.webkitRelativePath || f.relativeName || f.name, folder = nm.includes('/') ? nm.slice(0,nm.lastIndexOf('/')) : '';
     try {
       if (/\.(xlsx|xlsm)$/i.test(f.name)) {
         if (/headtail|swap/i.test(f.name)) { (cd.extras = cd.extras || []).push({ name: nm, blob: f }); continue; }
         const rec = await ingestWorkbook(nm, f);
         if (!rec.worms.length) throw new Error('no usable rows');
-        rec.blob = f; cd.files.push(rec); loaded++;
+        rec.blob = f; cd.files.push(rec); added.push({rec,folder}); loaded++;
       } else if (/\.json$/i.test(f.name)) {
-        const m = metaFromJson(await f.text()); if (m) folderMeta = { ...folderMeta, ...m };
+        const m = metaFromJson(await f.text()); if (m) {
+          const old=folderMetas.get(folder);
+          if(old === false || (old && Object.keys(m).some(k=>old[k] && old[k]!==m[k]))) { folderMetas.set(folder,false); problems.push(nm+': conflicting folder calibration; use explicit per-file overrides'); }
+          else folderMetas.set(folder,{...old,...m});
+        }
         (cd.extras = cd.extras || []).push({ name: nm, blob: f });
       } else if (/\.(csv|tsv|txt)$/i.test(f.name)) {
         const rec = ingestCSV(nm, await f.text());
         if (!rec.worms.length) throw new Error('no usable rows');
-        rec.blob = f; cd.files.push(rec); loaded++;
+        rec.blob = f; cd.files.push(rec); added.push({rec,folder}); loaded++;
       }
     } catch (err) { problems.push(`${f.name}: ${err.message}`);
       if (/\.(txt|json)$/i.test(f.name)) (cd.extras = cd.extras || []).push({ name: nm, blob: f }); }
   }
-  if (folderMeta && loaded) cd.files.slice(-loaded).forEach(r => { r.meta = { ...folderMeta, ...r.meta }; });
-  if (problems.length && (!many || !loaded)) alert('Could not read:\n' + problems.join('\n'));
+  added.forEach(({rec,folder})=>{const meta=folderMetas.get(folder);if(meta)rec.meta={...meta,...rec.meta};});
+  if (problems.length && (!many || !loaded || problems.some(p=>p.includes('conflicting folder calibration')))) alert('Could not read:\n' + problems.join('\n'));
   autoCalibrate();
   if (!ST.qualOn.size) defaultQual();
   renderQual(); renderConds(); schedule();
@@ -3291,7 +3541,7 @@ function autoCalibrate() {
     if (String(w) !== $('smoothWin').value) { $('smoothWin').value = w;
       notes.push(`smoothing window set to <b>${w} frames</b> (≈0.5 s at this frame rate)`); } }
   if (fps.length > 1) notes.push(`<b>warning:</b> the loaded files report different frame rates (${fps.map(v => +v.toFixed(3)).join(', ')})`);
-  AUTO_NOTE = notes.length ? '<div class="note">Auto-detected: ' + notes.join('; ') + '. Change either box to override.</div>' : '';
+  AUTO_NOTE = notes.length ? '<div class="note">Auto-detected: ' + notes.join('; ') + '. Per-file metadata takes precedence in per-file calibration mode.</div>' : '';
 }
 function defaultQual() { ST.qualOn = new Set([...ST.qualCodes].filter(q => q !== 3)); }
 function renderQual() {
@@ -3358,7 +3608,7 @@ function renderChips(A) {
 }
 
 /* ---- inputs ---- */
-const WATCH = ['fps','pxmm','rateUnit','smoothWin','smoothMethod','sgOrder','dt','minDisp','omegaThr','tcrit','methodACount','angThr','angWin','refrac',
+const WATCH = ['calibrationMode','smoothUnits','smoothSeconds','bearingEstimator','bearingExposure','bearingAggregation','bearingUnits','bearingWindow','bearingExclude','bearingMinDisp','bearingMinSpeed','bearingStraight','bearingMinObs','bearingCoverage','bearingMaxGap','fps','pxmm','rateUnit','smoothWin','smoothMethod','sgOrder','dt','minDisp','omegaThr','tcrit','methodACount','angThr','angWin','refrac',
  'primary','nUnit','errBar','barsOn','yAxisMode','maxStep','minFrames','minPath','dropZero','axAuto','axEqual','axFlipY','axOrigin',
  'axXmin','axXmax','axYmin','axYmax','trkLayout','trkMark','trkSize','trkColor','trkStart','trkEnd',
  'trkLW','trkOp','trkScale','trkGrid','spdMeasure','distMeasure','showEff','iriStat','iriDist','iriCensor','iriSpeed',
@@ -3591,7 +3841,7 @@ function setAxisRange(x0, x1, y0, y1) {
 function statsHTML(st, unitLabel) {
   if (!st || st.msg) return `<div class="empty">${st ? st.msg : 'No data.'}</div>`;
   const rows = [];
-  rows.push(`<div class="statbox"><p style="margin:0 0 10px">Design: <b>${st.design}</b> · replicate unit: <b>${cfg().nUnit === 'file' ? 'plate / file' : 'individual worm'}</b> · n = ${st.n.join(', ')}</p></div>`);
+  rows.push(`<div class="statbox"><p style="margin:0 0 10px">Design: <b>${st.design}</b> · replicate unit: <b>${st.unitLabel || (cfg().nUnit === 'file' ? 'plate / file' : 'individual worm')}</b> · n = ${st.n.join(', ')}</p></div>`);
   const nt = st.normality.map(o => `${o.name}: p = ${fmtP(o.p)}`).join(' · ');
   rows.push(`<div class="note">Normality screen (D'Agostino K², advisory only) — ${nt}. ${st.anyNonNormal
     ? 'At least one group departs from normality, so the <b>non-parametric</b> test is reported as primary.'
@@ -3652,7 +3902,7 @@ function renderAll() {
   if (!hasData) { $('dataSummary').innerHTML = '<div class="empty">No files loaded yet.</div>';
     ['trackFigs','diagFigs','reoFigs','spdFigs','iriFigs','tcFigs','navFigs','roamFigs','saltFigs','gmFigs'].forEach(i => $(i).innerHTML = '<div class="empty">Load data first.</div>');
     $('diagNote').innerHTML = ''; $('trackLegend').innerHTML = '';
-    ['reoStats','spdStats','iriStats','tcStats','navStats','roamStats','saltStats','reoTable','spdTable','iriTable','tcTable','navTable','roamTable','saltTable','gmTable','srcTable'].forEach(i => $(i).innerHTML = '');
+    ['reoStats','spdStats','iriStats','tcStats','navStats','roamStats','saltStats','reoTable','spdTable','iriTable','tcTable','navTable','roamTable','saltTable','gmTable','srcTable','bearingDiagnostics','bearingValidation'].forEach(i => $(i).innerHTML = '');
     $('sideStat').textContent = ''; renderSaltModel(); renderSaltCode(); renderExport(); renderMethods(); renderGuide(); return; }
 
   const anyCL = ST.conds.some(cd => cd.files.some(f => f.hasCenterlines));
@@ -3661,6 +3911,12 @@ function renderAll() {
   if (!anyCL && $('primary').value === 'C') $('primary').value = 'A';
 
   const A = runAnalysis();
+  if(A.c.calibrationConflict) {
+    const message='Loaded files mix calibrated and uncalibrated time or distance units. Set the missing per-file calibrations or global fallbacks before comparing or pooling results. Different known frame rates and scales are supported.';
+    ['trackFigs','diagFigs','reoFigs','spdFigs','iriFigs','tcFigs','navFigs','roamFigs','saltFigs','gmFigs'].forEach(id=>$(id).innerHTML='<div class="empty">'+message+'</div>');
+    ['reoStats','spdStats','iriStats','tcStats','navStats','roamStats','saltStats','reoTable','spdTable','iriTable','tcTable','navTable','roamTable','saltTable','gmTable','bearingDiagnostics','bearingValidation'].forEach(id=>$(id).innerHTML='');
+    $('dataSummary').textContent=message;exportBearingCalibration(A);renderExport();return;
+  }
   if (!TOUCHED.has('tcBin')) { const md = maxOf(A.rows.map(r => r.dur).filter(isFinite));
     if (isFinite(md) && md > 0) { const raw = md / 10;
       const mag = Math.pow(10, Math.floor(Math.log10(raw))), n = raw / mag;
@@ -4043,7 +4299,7 @@ function renderMetric(A, which) {
     .concat([`Mean run distance A (${c.sUnit})`, `Mean run distance B (${c.sUnit})`])
     .concat(anyCL ? [`Mean run distance C (${c.sUnit})`] : [])
     .concat(['Fraction roaming', `Roaming bout (${c.tUnit})`, `Dwelling bout (${c.tUnit})`,
-      'MSD exponent', 'MSD D', 'Mean cos θ', 'Turn-rate slope', 'Weathervaning slope', 'Mean Δcos θ per turn']), rows);
+      'MSD exponent', 'MSD D', 'Mean cos θ', 'Legacy worm turn-rate slope', 'Weathervaning slope', 'Mean Δcos θ per turn']), rows);
 }
 
 /* ============================================================================
@@ -4227,13 +4483,209 @@ function renderSrcTable(A) {
   host.appendChild(el('div', { class: 'note', id: 'srcNote', html: noteHtml }));
 }
 
+function bearingValidationSignature() {
+  const o=settingsObj();delete o.__generated;
+  return JSON.stringify({settings:o,files:ST.conds.flatMap(cd=>cd.files.map(f=>[f.id,f.nRows]))});
+}
+function renderBearingValidation() {
+  const host=$('bearingValidation');if(!host)return;
+  if(!ST.validation){host.textContent='No validation run for this session.';return;}
+  const stale=ST.validation.signature!==bearingValidationSignature();
+  host.innerHTML=(stale?'<p class="note">Settings or inputs changed. These are saved results from the previous run; rerun to validate the current settings.</p>':'<p class="note">Results match the current inputs and settings.</p>')+
+    '<p class="note">Every sweep holds all other settings fixed. “7.5 fps matched” and “3.75 fps downsampled” use the same smoothing duration in seconds. Compare the corresponding plate slopes, event counts and exposure in each bearing bin. Event detection can change under resampling; equality is not assumed.</p>'+
+    tableHTML('bearing_validation_summary','bearing_validation_summary',ST.validation.summaryHead,ST.validation.summaryRows);
+  ST.tables.bearing_sensitivity_bins={name:'bearing_sensitivity_bins',rows:[ST.validation.binHead,...ST.validation.binRows]};
+  ST.tables.bearing_validation_settings={name:'bearing_validation_settings',rows:[['Variant','Settings JSON'],['__baseline',JSON.stringify(ST.validation.settings)],['__matches_current_settings',String(!stale)],...ST.validation.variants.map(v=>[v.name,JSON.stringify(v.patch)])]};
+}
+async function runBearingValidation() {
+  const btn=$('bearingValidate');btn.disabled=true;btn.textContent='Running validation…';
+  try {
+    const c=cfg(),signature=bearingValidationSignature(),baseSettings=settingsObj(), conds=ST.conds.map(cd=>({...cd,files:cd.files.map(f=>({...f}))}));
+    const geometrySnapshot=new Map(ST.analysis?.conds.flatMap(cd=>cd.used.filter(w=>w.nav).map(w=>[w.fileId+':'+w.id,{...w.nav.geometry}]))||[]);
+    const variants=[{name:'Current settings',patch:{}}];
+    const add=(field,values)=>[...new Set(values)].forEach(v=>{if(v!==c[field])variants.push({name:field+' = '+v,patch:{[field]:v}});});
+    add('angWin',[c.angWin*.75,c.angWin*1.25]);add('refrac',[c.refrac*.75,c.refrac*1.25]);
+    if(c.smoothUnits==='seconds')add('smoothSeconds',[c.smoothSeconds*.75,c.smoothSeconds*1.25]);
+    else add('smoothWin',[Math.max(1,c.smoothWin-2),c.smoothWin+2]);
+    add('bearingWindow',[2,2.5,3]);add('bearingExclude',[0,1]);
+    add('bearingMinDisp',[0,c.bearingMinDisp*.75,c.bearingMinDisp*1.25]);
+    add('bearingMinSpeed',[0,c.bearingMinSpeed>0?c.bearingMinSpeed*1.25:1]);
+    add('bearingStraight',[Math.max(0,c.bearingStraight-.15),Math.min(1,c.bearingStraight+.15)]);
+    add('bearingMaxGap',[Math.max(.01,c.bearingMaxGap*.75),c.bearingMaxGap*1.25]);
+    variants.push({name:'7.5 fps matched',patch:{frameValidation:'original'}},{name:'3.75 fps downsampled',patch:{frameValidation:'downsample'}});
+    const summaryRows=[],binRows=[];
+    for(let vi=0;vi<variants.length;vi++) {
+      const variant=variants[vi],cc={...c,...variant.patch};
+      for(const cd of conds) {
+        const ws=[];
+        for(const f of cd.files) {
+          let fc=configForFile(f,cc);const frameCheck=!!variant.patch.frameValidation;
+          if(frameCheck&&Math.abs(fc.F-7.5)>1e-5)continue;
+          if(frameCheck) {
+            const seconds=fc.smoothUnits==='seconds'?fc.smoothSeconds:Math.max(0,fc.smoothWin-1)/fc.F;
+            fc=configForFile({...f,meta:{},fpsOverride:variant.patch.frameValidation==='downsample'?3.75:7.5},
+              {...cc,calibrationMode:'file',smoothUnits:'seconds',smoothSeconds:seconds});
+          }
+          // Reuse the live reference direction for random-reference controls.
+          for(const raw of f.worms) {
+            const geom=geometrySnapshot.get(f.id+':'+raw.id)||geomFor(f,cd,fc);if(!geom)continue;
+            let input=raw;
+            if(variant.patch.frameValidation==='downsample') {
+              const origin=raw.f[0],idx=raw.f.map((_,i)=>i).filter(i=>Math.round(raw.f[i]-origin)%2===0);
+              input={id:raw.id,f:idx.map(i=>raw.f[i]/2),x:idx.map(i=>raw.x[i]),y:idx.map(i=>raw.y[i]),q:idx.map(i=>raw.q[i])};
+            }
+            const w=analyzeWorm(input,fc);if(!w.ok)continue;
+            Object.assign(w,{file:f.name,fileId:f.id,plateId:f.plateId||f.id,day:f.day||''});
+            w.nav={revisedBearing:analyzeBearing(w,fc,geom,fc.bearingEstimator,fc.bearingExposure),legacyBearing:analyzeBearing(w,fc,geom,'legacy','legacy')};ws.push(w);
+          }
+        }
+        for(const [field,mode] of [['revisedBearing','selected'],['legacyBearing','legacy B']]) {
+          const plates=bearingPlateSummary(ws,cc,field);
+          plates.forEach(p=>{summaryRows.push([variant.name,cd.name,p.id,p.day,mode,p.total,p.assigned,p.total-p.assigned,p.bins.reduce((s,b)=>s+b.time,0),p.fit.slope,p.fit.r2]);
+            p.bins.forEach(b=>binRows.push([variant.name,cd.name,p.id,p.day,mode,b.x0,b.x1,b.n,b.time,b.mean]));});
+        }
+      }
+      btn.textContent=`Validation ${vi+1} / ${variants.length}`;
+      await new Promise(r=>setTimeout(r,0));
+    }
+    ST.validation={signature,settings:baseSettings,variants,summaryRows,binRows,
+      summaryHead:['Variant','Condition','Plate','Day','Analysis','Detected B events','Assigned','Unassignable','Eligible exposure','Plate slope','R squared'],
+      binHead:['Variant','Condition','Plate','Day','Analysis','cos from','cos to','Events','Exposure','Rate']};
+    renderBearingValidation();renderExport();
+  } catch(e) {$('bearingValidation').textContent='Validation failed: '+e.message;}
+  finally {btn.disabled=false;btn.textContent='Run sensitivity and frame-rate checks';}
+}
+$('bearingValidate').onclick=runBearingValidation;
+
+function exportBearingCalibration(A) {
+  const c=A.c;
+  const calibrationRows=A.conds.flatMap(cd=>cd.files.map(f=>{const fc=configForFile(f,c), step=Math.max(1,fc.dt*fc.F)/fc.F;
+    return [cd.name,f.name,f.plateId||f.id,f.day||'',fc.fps,fc.pxmm,fc.calibrationMode,fc.smoothUnits,fc.smoothWin,Math.max(0,fc.smoothWin-1)/fc.F,fc.dt,step,fc.angWin,Math.max(1,Math.round(fc.angWin/fc.dt))*step];}));
+  ST.tables.bearing_calibration={name:'bearing_calibration',rows:[['Condition','File','Plate','Day','FPS','px/mm','Calibration mode','Smoothing unit','Configured smoothing frames','Configured smoothing span','Requested sampling interval','Achieved sampling interval','Requested comparison half-window','Achieved comparison half-window'],...calibrationRows]};
+}
+function exportBearingTables(A, withNav) {
+  const c = A.c, eventRows = [], timeRows = [], plateRows = [], slopeRows = [], countRows = [], coverageRows = [], assignmentRows = [];
+  const eventHead = ['Condition','Plate','Day','File','File ID','Worm','Analysis','Estimator','Exposure mode','Event','Peak time','Estimated onset','Span start index','Span end index','Bearing assignable','Quality flags','cos theta','Bin (1-based)','Heading window start','Heading window end','Pre-turn X','Pre-turn Y','Heading deg','Net displacement','Fitted speed','Straightness','Valid observations','Window coverage','Maximum gap s','QC distance unit','FPS','px/mm','Effective smoothing frames','Legacy Method B cos theta','Legacy Method B bin','Position unit','Time unit'];
+  withNav.forEach(({cd, ws}) => {
+    ['revisedBearing','legacyBearing'].forEach(field => {
+      const mode = field === 'revisedBearing' ? 'selected' : 'legacy';
+      ws.forEach(w => {
+        const d = w.nav[field], fc = w.calibration;
+        d.events.forEach((q,i) => {
+          const old = field === 'legacyBearing' ? q : w.nav.legacyMethodB.events[i];
+          eventRows.push([cd.name,w.plateId,w.day,w.file,w.fileId,w.id,mode,d.estimator,d.exposureMode,i+1,q.event.t,q.onset,q.event.span[0],q.event.span[1],q.valid,q.reasons.join(';'),q.cos,q.bin==null?null:q.bin+1,
+            q.start,q.end,q.x,q.y,q.heading,q.displacement,q.speed,q.straightness,q.observations,q.coverage,q.maxGap,
+            c.bearingUnits,fc.fps,fc.pxmm,fc.smoothWin,old?.cos,old?.bin==null?null:old.bin+1,fc.sUnit,fc.tUnit]);
+        });
+        d.exposure.forEach(q => timeRows.push([cd.name,w.plateId,w.day,w.file,w.id,mode,q.intervalStart,q.intervalEnd,q.duration,q.valid,q.reasons.join(';'),q.cos,q.bin==null?null:q.bin+1,q.start,q.end,q.displacement,q.speed,q.straightness,q.observations,q.coverage,q.maxGap]));
+      });
+      const plates = bearingPlateSummary(ws,c,field);
+      plates.forEach(p => {
+        p.bins.forEach(b=>plateRows.push([cd.name,p.id,p.day,p.dayConflict,mode,b.x0,b.x1,b.mid,b.n,b.time,b.mean,b.worms,c.tUnit,c.rateUnit]));
+        slopeRows.push([cd.name,p.id,p.day,p.dayConflict,mode,p.total,p.assigned,p.total-p.assigned,p.fit.slope,p.fit.intercept,p.fit.r2,p.fit.n||0]);
+      });
+      const series = bearingSeries([{cd,ws}],c,field,'plate')[0];
+      series.bins.forEach(b=>coverageRows.push([cd.name,mode,b.x0,b.x1,b.count,b.time,b.worms,b.plates,b.mean,b.sem]));
+    });
+  });
+  A.conds.forEach(cd => {
+    const byPlate=new Map();
+    cd.used.forEach(w=>{
+      const key=JSON.stringify([w.plateId,w.day]);if(!byPlate.has(key))byPlate.set(key,{plate:w.plateId,day:w.day,total:0,assigned:0,missing:0});
+      const p=byPlate.get(key);p.total+=w.evB.length;p.assigned+=w.nav?.revisedBearing.assigned||0;
+      if(!w.nav) {p.missing+=w.evB.length;w.evB.forEach((e,i)=>{
+        const row={'Condition':cd.name,'Plate':w.plateId,'Day':w.day,'File':w.file,'File ID':w.fileId,'Worm':w.id,'Analysis':'selected',
+          'Estimator':c.bearingEstimator,'Exposure mode':c.bearingExposure,'Event':i+1,'Peak time':e.t,'Estimated onset':w.ts[e.span[0]],
+          'Span start index':e.span[0],'Span end index':e.span[1],'Bearing assignable':false,'Quality flags':'missing_source_geometry',
+          'Position unit':w.calibration.sUnit,'Time unit':w.calibration.tUnit,'FPS':w.calibration.fps,'px/mm':w.calibration.pxmm,'QC distance unit':c.bearingUnits,'Effective smoothing frames':w.calibration.smoothWin};
+        eventRows.push(eventHead.map(h=>row[h]??null));
+      });}
+    });
+    byPlate.forEach(p=>assignmentRows.push([cd.name,p.plate,p.day,p.total,p.assigned,p.total-p.assigned,p.missing]));
+    const total = cd.used.reduce((s,w)=>s+w.evB.length,0), assigned=cd.used.reduce((s,w)=>s+(w.nav?.revisedBearing.assigned||0),0);
+    countRows.push([cd.name,total,assigned,total-assigned,cd.used.filter(w=>!w.nav).reduce((s,w)=>s+w.evB.length,0)]);
+  });
+  const put = (key,head,rows) => ST.tables[key]={name:key,rows:[head,...rows]};
+  exportBearingCalibration(A);
+  put('bearing_events',eventHead,eventRows);
+  put('bearing_exposure',['Condition','Plate','Day','File','Worm','Analysis','Interval start','Interval end','Duration','Eligible and assignable','Flags','cos theta','Bin (1-based)','Heading window start','Heading window end','Net displacement','Fitted speed','Straightness','Observations','Coverage','Maximum gap s'],timeRows);
+  put('bearing_plate_bins',['Condition','Plate','Day','Conflicting day IDs','Analysis','cos from','cos to','cos mid','Events','Exposure','Rate','Contributing worms','Time unit','Rate unit setting'],plateRows);
+  put('bearing_plate_slopes',['Condition','Plate','Day','Conflicting day IDs','Analysis','Detected events','Assigned bearings','Unassignable','Slope','Intercept','R squared','Supported bins'],slopeRows);
+  put('bearing_event_counts',['Condition','Detected Method B events','Assigned Method B bearings','Unassignable Method B bearings','Events without source geometry'],countRows);
+  put('bearing_assignment_by_plate',['Condition','Plate','Day','Detected Method B events','Assigned bearings','Unassignable bearings','Events without source geometry'],assignmentRows);
+  put('bearing_coverage',['Condition','Analysis','cos from','cos to','Events','Exposure','Contributing worms','Contributing plates','Plate mean rate','Plate SEM'],coverageRows);
+  return {countRows,coverageRows,plateRows,slopeRows,assignmentRows};
+}
+function bearingEventFig(w, selected, c) {
+  const fig=new Fig(620,400,'Method B event and pre-turn heading'), q=w.nav.revisedBearing.events[selected];
+  if(!q) return fig;
+  const lo=q.onset-c.bearingExclude-c.bearingWindow-2*w.dt, hi=q.event.t+Math.max(c.angWin,2*w.dt)+2;
+  const indexes=w.ts.map((t,i)=>i).filter(i=>w.ts[i]>=lo&&w.ts[i]<=hi&&w.xs[i]!=null);
+  if(!indexes.length) return fig;
+  const allX=indexes.flatMap(i=>[w.xs[i],(w.bearingXs||w.xs)[i]]).filter(Number.isFinite),allY=indexes.flatMap(i=>[w.ys[i],(w.bearingYs||w.ys)[i]]).filter(Number.isFinite);
+  let xd=[minOf(allX),maxOf(allX)], yd=[minOf(allY),maxOf(allY)];
+  const span=Math.max(xd[1]-xd[0],yd[1]-yd[0],1/w.calibration.K), mx=S.mean(xd),my=S.mean(yd);
+  xd=[mx-span*.65*500/290,mx+span*.65*500/290];yd=[my-span*.65,my+span*.65];
+  const a=frame(fig,{x0:65,y0:38,x1:565,y1:328},xd,yd,{grid:true,xlab:'X ('+w.calibration.sUnit+')',ylab:'Y ('+w.calibration.sUnit+')'});
+  fig.text(20,20,`Event ${selected+1}: ${q.valid?'assignable':'bearing unassignable'}`,{size:12,weight:'bold'});
+  indexes.forEach((i,k)=>{if(k&&i===indexes[k-1]+1) fig.line(a.sx(w.xs[i-1]),a.sy(w.ys[i-1]),a.sx(w.xs[i]),a.sy(w.ys[i]),{stroke:'#8b93a1',sw:1.5});
+    const inWindow=w.ts[i]>=q.start&&w.ts[i]<=q.end, x=(w.bearingXs||w.xs)[i],y=(w.bearingYs||w.ys)[i];
+    if(inWindow&&x!=null&&y!=null) fig.circle(a.sx(x),a.sy(y),3,{fill:'#2a6df4'});
+    else fig.circle(a.sx(w.xs[i]),a.sy(w.ys[i]),1.5,{fill:'#8b93a1'});
+  });
+  w.nav.revisedBearing.events.forEach(e=>{if(e.event.t>=lo&&e.event.t<=hi) fig.circle(a.sx(e.event.x),a.sy(e.event.y),5,{stroke:e.valid?'#12a67a':'#d1495b',sw:2,fill:'#ffffff'});});
+  if(q.heading!=null&&q.x!=null) {
+    const rad=q.heading*Math.PI/180, len=span*.22, x=q.x,y=q.y;
+    const tip=[x+Math.cos(rad)*len,y+Math.sin(rad)*len], color=q.valid?'#12a67a':'#d1495b';
+    fig.line(a.sx(x),a.sy(y),a.sx(tip[0]),a.sy(tip[1]),{stroke:color,sw:2.5});
+    [rad-.5,rad+.5].forEach(r=>fig.line(a.sx(tip[0]),a.sy(tip[1]),a.sx(tip[0]-.25*len*Math.cos(r)),a.sy(tip[1]-.25*len*Math.sin(r)),{stroke:color,sw:2}));
+    const g=w.nav.geometry, dir=g.mode==='dir'?g.dir*Math.PI/180:Math.atan2(g.y-y,g.x-x);
+    fig.line(a.sx(x),a.sy(y),a.sx(x+Math.cos(dir)*span*.35),a.sy(y+Math.sin(dir)*span*.35),{stroke:'#c58a14',sw:1.5,dash:'4,3'});
+  }
+  fig.text(65,365,'Blue: unsmoothed heading observations; grey: detector track; gold: source.',{size:10});
+  fig.text(65,384,'Green / red circles: detected event peaks with passing / rejected bearings.',{size:10});
+  return fig;
+}
+function renderBearingDiagnostics(A, withNav) {
+  const host=$('bearingDiagnostics');host.innerHTML='';
+  const tables=exportBearingTables(A,withNav);
+  host.appendChild(el('div',{class:'scroll',html:tableHTML('bearing_event_counts','bearing_event_counts',ST.tables.bearing_event_counts.rows[0],tables.countRows)}));
+  const calibration=el('details');calibration.appendChild(el('summary',{},'Per-file calibration and achieved timing'));calibration.appendChild(el('div',{class:'scroll',html:tableHTML('bearing_calibration','bearing_calibration',ST.tables.bearing_calibration.rows[0],ST.tables.bearing_calibration.rows.slice(1))}));host.appendChild(calibration);
+  const assignment=el('details');assignment.appendChild(el('summary',{},'Bearing assignment by plate'));assignment.appendChild(el('div',{class:'scroll',html:tableHTML('bearing_assignment_by_plate','bearing_assignment_by_plate',ST.tables.bearing_assignment_by_plate.rows[0],tables.assignmentRows)}));host.appendChild(assignment);
+  const coverage=el('details');coverage.appendChild(el('summary',{},'Coverage by bearing bin (selected and legacy)'));
+  coverage.appendChild(el('div',{class:'scroll',html:tableHTML('bearing_coverage','bearing_coverage',ST.tables.bearing_coverage.rows[0],tables.coverageRows)}));host.appendChild(coverage);
+  const plates=el('details');plates.appendChild(el('summary',{},'Plate counts, exposure and rates'));
+  plates.appendChild(el('div',{class:'scroll',html:tableHTML('bearing_plate_bins','bearing_plate_bins',ST.tables.bearing_plate_bins.rows[0],tables.plateRows)}));host.appendChild(plates);
+  const grid=el('div',{class:'figgrid'});
+  [['displacement','Pre-turn net displacement',A.c.bearingUnits],['speed','Pre-turn fitted speed',A.c.bearingUnits+'/s'],['straightness','Pre-turn straightness','net / path']].forEach(([field,title,unit])=>{
+    const groups=withNav.map(({cd,ws})=>({name:cd.name,color:cd.color,values:ws.flatMap(w=>w.nav.revisedBearing.events.map(q=>q[field])).filter(Number.isFinite)})).filter(g=>g.values.length);
+    if(groups.length)grid.appendChild(figCard('bearing_quality_'+field,distFig(title,groups,unit,'ecdf'),'All evaluable detected events, including quality failures. Missing estimates have no measurement to plot.',{wide:wideFromGroups('bearing_quality_'+field,groups)}));
+  });host.appendChild(grid);
+  const worms=withNav.flatMap(({ws})=>ws).filter(w=>w.nav.revisedBearing.events.length);
+  if(!worms.length)return;
+  const key=w=>w.fileId+':'+w.id, track=el('select',{'aria-label':'Diagnostic track'}), event=el('select',{'aria-label':'Diagnostic event'}), detail=el('div');
+  worms.forEach(w=>track.appendChild(el('option',{value:key(w)},`${w.cond} · ${w.file} · worm ${w.id}`)));
+  track.value=worms.some(w=>key(w)===ST.bearingTrack)?ST.bearingTrack:key(worms[0]);
+  const show=()=>{
+    ST.bearingTrack=track.value;const w=worms.find(w=>key(w)===track.value), id=Number(event.value)||0;ST.bearingEvent=id;
+    const q=w.nav.revisedBearing.events[id],old=w.nav.legacyMethodB.events[id];detail.innerHTML='';if(!q)return;
+    detail.appendChild(figCard('bearing_event_inspection',bearingEventFig(w,id,A.c),'The vector is centred on the mean pre-turn position. Geometry is shown in the original coordinate system; event circles show detector peaks, while the table reports estimated onset.'));
+    const rows=[['Estimated onset / detector peak',`${fmt(q.onset,4)} / ${fmt(q.event.t,4)} s`],['Status',q.valid?'assignable':q.reasons.join('; ')],['Selected cos θ / bin',`${fmt(q.cos,4)} / ${q.bin==null?'unassignable':q.bin+1}`],['Legacy Method B cos θ / bin',`${fmt(old?.cos,4)} / ${old?.bin==null?'unassignable':old.bin+1}`],['Requested window',`${fmt(q.requestStart,4)} – ${fmt(q.requestEnd,4)} s`],['Observed window',`${fmt(q.start,4)} – ${fmt(q.end,4)} s`],['Observations / coverage',`${q.observations} / ${fmt(q.coverage,3)}`],['Displacement / fitted speed',`${fmt(q.displacement,4)} ${A.c.bearingUnits} / ${fmt(q.speed,4)} ${A.c.bearingUnits}/s`],['Straightness / maximum gap',`${fmt(q.straightness,4)} / ${fmt(q.maxGap,4)} s`]];
+    detail.appendChild(el('div',{class:'scroll',html:tableHTML('bearing_inspected_event','bearing_inspected_event',['Measurement','Value'],rows)}));
+  };
+  const fill=()=>{const w=worms.find(w=>key(w)===track.value);event.innerHTML='';w.nav.revisedBearing.events.forEach((q,i)=>event.appendChild(el('option',{value:String(i)},`Event ${i+1} · onset ${fmt(q.onset,2)} · ${q.valid?'pass':q.reasons.join(', ')}`)));event.value=String(Math.min(ST.bearingEvent||0,w.nav.revisedBearing.events.length-1));show();};
+  track.onchange=fill;event.onchange=show;host.appendChild(el('h4',{},'Inspect an individual event'));host.appendChild(el('div',{class:'row'},[track,event]));host.appendChild(detail);fill();
+}
+
 function renderNav(A) {
   const c = A.c, host = $('navFigs'), statHost = $('navStats'), tabHost = $('navTable');
   renderSrcTable(A);
+  $('bearingDiagnostics').innerHTML = '';
+  renderBearingValidation();
   host.innerHTML = ''; statHost.innerHTML = ''; tabHost.innerHTML = '';
   if (c.navMode === 'none') { host.innerHTML = '<div class="empty">Gradient analyses are switched off.</div>'; return; }
   const withNav = A.conds.map(cd => ({ cd, ws: cd.used.filter(w => w.nav) })).filter(o => o.ws.length);
-  if (!withNav.length) { host.innerHTML = '<div class="empty">Mark the odour source above (or click it on a track panel) to unlock these analyses.</div>'; return; }
+  if (!withNav.length) { renderBearingDiagnostics(A, withNav); host.innerHTML = '<div class="empty">Mark the odour source above (or click it on a track panel) to unlock these analyses.</div>'; return; }
 
   const grid = el('div', { class: 'figgrid' });
   const blocks = [], zeroRows = [];
@@ -4251,50 +4703,30 @@ function renderNav(A) {
       rows: [['Condition', 'Gradient', 'n', 'Mean', 'SD', 'SEM', 'Median'],
         ...groups.map(g => [g.name, noGradIds.has(g.id) ? 'no' : 'yes', g.values.length, S.mean(g.values), S.sd(g.values), S.sem(g.values), S.median(g.values)])] }; };
 
-/* Worm Track Analyzer — local drop-in replacement for the block at index.html
-   renderNav(), immediately below:
-     /* --- reorientation rate vs bearing (Kramer et al. 2026) --- * /
-   Replace the existing `const rateSeries = ...` block, but retain the
-   subsequent grid.appendChild(figCard('bearing_turn_rate', ...)).
-
-   This takes the per-worm counts and time exposures ALREADY computed by
-   addNav(), aggregates them within independent plates/files, and then
-   plots the mean and SEM of plate rates rather than unweighted worm rates.
-   No change to Method B detection, event attribution, bin edges or settings.
-*/
-const rateSeries = withNav.map(({ cd, ws }) => {
-  const nb = ws[0].nav.rateBins.length, bins = [];
-  const byPlate = new Map();
-  ws.forEach(w => {
-    const key = w.fileId || w.file;
-    if (!byPlate.has(key))
-      byPlate.set(key, Array.from({ length: nb }, () => ({ count: 0, seconds: 0 })));
-    const exposure = byPlate.get(key);
-    for (let k = 0; k < nb; k++) {
-      const b = w.nav.rateBins[k];
-      exposure[k].count += b.n;       // detected Method B events
-      exposure[k].seconds += b.time; // observed seconds in that bearing bin
-    }
-  });
-  for (let k = 0; k < nb; k++) {
-    const b0 = ws[0].nav.rateBins[k];
-    const v = [...byPlate.values()].map(a => {
-      const d = a[k];
-      return d.seconds > 0 ? rateOf(d.count, d.seconds, c) : NaN;
-    }).filter(Number.isFinite);
-    bins.push({ x0: b0.x0, x1: b0.x1, mid: b0.mid,
-      values: v, mean: S.mean(v), sem: S.sem(v), n: v.length });
-  }
-  return { name: cd.name, color: cd.color, bins,
-    dash: cd.grad === 'no' ? '5,4' : null };
-});
-
+  const rateSeries = bearingSeries(withNav, c);
+  const legacySeries = bearingSeries(withNav, c, 'legacyBearing');
   grid.appendChild(figCard('bearing_turn_rate',
-    timeCourseFig('Reorientation rate vs bearing to the source', rateSeries, 'bearing to source, cos θ  (+1 = heading at it)', rateLabel(c), 'line', null),
-    'Kramer et al. 2026: bearing is cos θ, the angle between the direction of travel and the direction to the odour. A downward slope means the animal suppresses turning while it is heading the right way — the biased random walk. Dashed lines are no-gradient controls and should be flat.',
+    timeCourseFig('Selected analysis — rate vs bearing', rateSeries, 'bearing to source, cos θ', rateLabel(c), 'line', null),
+    `Method B; ${c.bearingEstimator} heading; ${c.bearingExposure} exposure; ${c.bearingAggregation} aggregation. Counts and exposure are pooled within each plate before mean ± SEM across plates. Missing exposure is undefined, not a zero rate.`,
     { wide: wideFromSeries('bearing_turn_rate', rateSeries, 'cos theta') }));
-  panel('bearing_slope', 'Turn-rate vs bearing slope', r => r.navSlope, `slope (${rateLabel(c)} per unit cos θ)`,
-    'One regression slope per replicate. Negative = fewer reorientations when heading toward the source. Zero means no bias.');
+  grid.appendChild(figCard('bearing_turn_rate_legacy',
+    timeCourseFig('Legacy analysis — rate vs bearing', legacySeries, 'bearing to source, cos θ', rateLabel(c), 'line', null),
+    `Original adjacent-interval bearing and all-time denominator, using primary detector ${c.primary}. The aggregation control applies to both curves. Use Method B as primary for a detector-matched comparison.`,
+    { wide: wideFromSeries('bearing_turn_rate_legacy', legacySeries, 'cos theta') }));
+  const plateGroups = withNav.map(({cd,ws}) => ({name:cd.name,id:cd.id,color:cd.color,
+    plates:bearingPlateSummary(ws,c), values:[],labels:[]}));
+  plateGroups.forEach(g => g.plates.filter(p => Number.isFinite(p.fit.slope)).forEach(p => {g.values.push(p.fit.slope);g.labels.push(p.id+(p.day?' · '+p.day:''));}));
+  const slopeGroups=plateGroups.filter(g=>g.values.length), slopeStats=statsFor(slopeGroups);
+  slopeStats.unitLabel='plate';
+  if(slopeGroups.some(g=>g.values.length<2)) { slopeStats.msg='At least two independent plates per condition are required for an unadjusted slope comparison.'; slopeStats.pairs=[]; slopeStats.primaryP=NaN; }
+  if(slopeGroups.length) {
+    grid.appendChild(figCard('bearing_slope',dotFig('Plate-level bearing dependence',slopeGroups,`slope (${rateLabel(c)} per cos θ)`,slopeStats,{errBar:'sem',h:300,bars:c.barsOn,yMode:c.yAxisMode}),
+      'One unweighted least-squares slope across supported bin centres per plate, after pooling worm counts and time. At least three bins with positive exposure are required. Zero-event bins with exposure are included. Plates are independent replicates regardless of the replicate setting elsewhere.',{wide:wideFromGroups('bearing_slope',slopeGroups)}));
+    blocks.push({title:'Plate bearing slopes (unadjusted)',st:slopeStats});
+  }
+  const adjusted=comparePlateSlopes(plateGroups);
+  const dayHTML=adjusted.error ? '<div class="note">'+escXml(adjusted.error)+'</div>' :
+    '<div class="note">Plate slope ~ genotype + experimental day; treatment-coded OLS, HC1 robust standard errors, t reference with n − parameters degrees of freedom. Estimates are exploratory with few plates. Genotype slope contrasts measure differences in bearing dependence.</div>'+tableHTML('bearing_day_effects','bearing_day_effects',['Effect','Slope difference','Robust SE','t','df','p'],adjusted.effects.map(e=>[e.label,e.estimate,e.se,e.t,e.df,e.p]));
 
   /* --- weathervaning --- */
   const wvSeries = withNav.map(({ cd, ws }) => {
@@ -4343,16 +4775,18 @@ const rateSeries = withNav.map(({ cd, ws }) => {
     ST.tables['navigation_vs_zero'] = { name: 'navigation_vs_zero',
       rows: [['Measure', 'Condition', 'Gradient', 'n', 'Mean', 't', 'p', 'p (Holm)', 'Signed-rank p'],
         ...zeroRows.map(r => [r.metric, r.name, r.noGrad ? 'no' : 'yes', r.n, r.mean, r.t, r.p, r.padj, r.wp])] }; }
-  statHost.innerHTML = shufHtml + zeroHtml + blocks.map((b, i) =>
+  statHost.innerHTML = dayHTML + shufHtml + zeroHtml + blocks.map((b, i) =>
     `<details ${i === 0 ? 'open' : ''} style="margin-top:12px;border-top:1px solid var(--line);padding-top:10px"><summary style="cursor:pointer;font-size:13px;font-weight:600;color:var(--ink-2)">${b.title}${b.st && isFinite(b.st.primaryP) ? ` — p = ${fmtP(b.st.primaryP)} ${stars(b.st.primaryP)}` : ''}</summary><div style="margin-top:10px">${statsHTML(b.st)}</div></details>`).join('');
 
   const rows = A.rows.filter(r => isFinite(r.navSlope) || isFinite(r.wvSlope))
     .map(r => [r.cond, r.noGrad ? 'no' : 'yes', r.file, r.worm, r.meanCos, r.navSlope, r.wvSlope, r.dBearing]);
   tabHost.innerHTML = tableHTML('navigation', 'navigation_metrics',
-    ['Condition', 'Gradient', 'File', 'Worm', 'Mean cos θ', 'Turn-rate slope', 'Weathervaning slope', 'Mean Δ cos θ per turn'], rows);
+    ['Condition', 'Gradient', 'File', 'Worm', 'Mean cos θ', 'Legacy worm turn-rate slope', 'Weathervaning slope', 'Mean Δ cos θ per turn'], rows);
   const bins = [];
   rateSeries.forEach(s2 => s2.bins.forEach(b => bins.push([s2.name, b.x0, b.x1, b.n, b.mean, b.sem])));
   ST.tables['bearing_bins'] = { name: 'bearing_bins', rows: [['Condition', 'cos θ from', 'cos θ to', 'n', 'Mean rate', 'SEM'], ...bins] };
+  renderBearingDiagnostics(A, withNav);
+  renderBearingValidation();
   const wb = [];
   wvSeries.forEach(s2 => s2.bins.forEach(b => wb.push([s2.name, b.x0, b.x1, b.n, b.mean, b.sem])));
   ST.tables['weathervaning_bins'] = { name: 'weathervaning_bins', rows: [['Condition', 'β from (deg)', 'β to (deg)', 'n', 'Mean curving rate', 'SEM'], ...wb] };
@@ -5161,7 +5595,7 @@ $('zipAll').onclick = async () => {
             if (!it.blob) throw new Error('no copy of this file is held');
             files.push({ name: path, data: await blobBytes(it.blob) });
             (it.kind === 'tracks' ? pc.files : pc.extras).push({ path, originalName: it.name,
-              source: r && r.src && isFinite(r.src.x) && isFinite(r.src.y) ? { x: r.src.x, y: r.src.y } : null });
+              metadata: r ? fileMetadata(r) : null, source: r && r.src && isFinite(r.src.x) && isFinite(r.src.y) ? { x: r.src.x, y: r.src.y } : null });
           } catch (e) { row[3] = ''; row[10] = 'could not be re-read: ' + e.message; missing++; }
           manifest.push(row);
         }
@@ -5231,6 +5665,13 @@ $('zipAll').onclick = async () => {
 /* ---- reopening an exported project ---- */
 let RESTORING = false;
 function applySettings(o) {
+  // Old archives/settings explicitly reopen in the original analysis mode.
+  if (!Object.hasOwn(o, 'bearingEstimator')) {
+    Object.assign(o = { ...o }, { bearingEstimator: 'legacy', bearingExposure: 'legacy', calibrationMode: 'global', smoothUnits: 'frames' });
+  }
+  (o.__conditions || []).forEach((cd, ci) => (cd.files || []).forEach((f, fi) => {
+    const rec = ST.conds[ci]?.files[fi]; if (rec && rec.name === f.name && f.metadata) Object.assign(rec, f.metadata);
+  }));
   Object.entries(o).forEach(([k, v]) => { if (k.startsWith('__')) return;
     const n = $(k); if (!n) return;
     if (n.type === 'checkbox') n.checked = !!v; else n.value = v;
@@ -5271,7 +5712,7 @@ async function openProjectZip(file) {
         const rec = /\.(xlsx|xlsm)$/i.test(base)
           ? await ingestWorkbook(pf.originalName || base, blob)
           : ingestCSV(pf.originalName || base, new TextDecoder().decode(bytes));
-        rec.blob = blob;
+        rec.blob = blob; Object.assign(rec, pf.metadata || {});
         if (pf.source && isFinite(pf.source.x) && isFinite(pf.source.y)) rec.src = { ...pf.source };
         cd.files.push(rec);
       } catch (e) { problems.push(`${base}: ${e.message}`); }
@@ -5308,7 +5749,12 @@ $('openProj').onchange = async () => { const f = $('openProj').files[0]; if (f) 
 function settingsObj() { const o = {}; document.querySelectorAll('input,select').forEach(n => { if (!n.id || n.type === 'file' || n.type === 'range') return;
   o[n.id] = n.type === 'checkbox' ? n.checked : n.value; });
   o.__quality = [...ST.qualOn]; o.__conditions = ST.conds.map(c => ({ name: c.name, color: c.color, gradient: c.grad || 'yes',
-    files: c.files.map(f => ({ name: f.name, source: f.src || null })) }));
+    files: c.files.map(f => ({ name: f.name, source: f.src || null, metadata: fileMetadata(f) })) }));
+  o.__bearingDefinitions = { version: 1, onset: 'first threshold crossing in Method B span', position: 'mean pre-turn position', headingInput: 'unsmoothed quality-filtered coordinates on existing resample grid',
+    turning: '[span start time, sample after span end)', refractory: '[span start time, max(turn end, peak time + refractory))',
+    quality: 'same estimator and quality/history criteria for events and exposure; no future samples in regression window',
+    slope: 'OLS on positive-exposure bin centres, at least 3 bins; counts and time pooled within plate', dayModel: 'plate slope ~ genotype + day; OLS HC1 covariance' };
+  const c=cfg(); o.__fileCalibration = ST.conds.flatMap(cd=>cd.files.map(f=>{const fc=configForFile(f,c);return {condition:cd.name,file:f.name,...fileMetadata(f),fps:fc.fps,pxmm:fc.pxmm,effectiveSmoothingFrames:fc.smoothWin};}));
   o.__generated = new Date().toISOString(); return o; }
 $('saveCfg').onclick = () => saveBlob(new Blob([JSON.stringify(settingsObj(), null, 2)], { type: 'application/json' }), 'worm_analysis_settings.json');
 $('loadCfgBtn').onclick = () => $('loadCfg').click();
@@ -5329,7 +5775,7 @@ function renderMethods() {
 <p>Two file layouts are understood, and they can be mixed freely between conditions.</p>
 <ul>
 <li><b>CSV</b> — one row per worm per frame, with <code>WormID, Frame, PositionX, PositionY</code> and optionally <code>Quality</code>. Column names are matched case- and separator-insensitively, so <code>x</code>/<code>centroid_x</code>/<code>PositionX</code> all work.</li>
-<li><b>Excel workbook</b> (<code>.xlsx</code>) — the <code>Tracks</code> sheet supplies the same columns. If the workbook also carries a <code>Parameters</code> sheet, the frame rate and pixel scale are read from it and filled in for you (you can always override them). If it carries a <code>Centerlines</code> sheet, the ten body points per frame unlock <b>Method C</b> below.</li>
+<li><b>Excel workbook</b> (<code>.xlsx</code>) — the <code>Tracks</code> sheet supplies the same columns. If the workbook also carries a <code>Parameters</code> sheet, the frame rate and pixel scale are read per file; explicit per-file overrides take precedence in per-file calibration mode. If it carries a <code>Centerlines</code> sheet, the ten body points per frame unlock <b>Method C</b> below.</li>
 </ul>
 <p>Dropping a whole condition folder is also supported: track files inside are loaded and a <code>worm_summary.json</code>, if present, is read for the frame rate and <code>um_per_pixel</code>. Files that are not track data — head/tail swap tables, processing summaries, thresholding settings — are ignored rather than treated as errors. The workbook is unzipped and parsed inside the page; nothing is uploaded.</p>
 <p>Note that the <code>Quality</code> code does not mean the same thing in every exporter: in one common output <code>3</code> flags a lost track written as (0,&nbsp;0), while in another <code>1</code> flags a frame where two animals were merged. The percentage of rows carrying each code is shown next to its checkbox on the <i>Data &amp; groups</i> tab so you can see which is which before deciding what to keep.</p>
@@ -5338,7 +5784,7 @@ function renderMethods() {
 <ul>
 <li>Rows whose tracker <code>Quality</code> code is not selected are removed, as are rows at exactly (0,&nbsp;0), which most trackers write when the animal is lost.</li>
 <li>Frame-to-frame displacements larger than the jump limit (<b>${fmt(c.maxStep)} px/frame</b>) are treated as identity swaps and dropped.</li>
-<li>The remaining centroid path is smoothed over <b>${c.smoothWin} frames</b> using ${c.smoothMethod === 'sg' ? `a <b>Savitzky–Golay filter of polynomial order ${c.sgOrder}</b>` : c.smoothMethod === 'none' ? '<b>no smoothing at all</b>' : 'a <b>centred moving average</b>'}. Smoothing removes the side-to-side wobble produced by the sinusoidal body wave, which would otherwise be read as continuous turning. See the note on filter choice below.</li>
+<li>The remaining centroid path is smoothed over <b>${c.smoothUnits === 'seconds' ? c.smoothSeconds + ' seconds (nearest centred time span per file)' : c.smoothWin + ' frames'}</b> using ${c.smoothMethod === 'sg' ? `a <b>Savitzky–Golay filter of polynomial order ${c.sgOrder}</b>` : c.smoothMethod === 'none' ? '<b>no smoothing at all</b>' : 'a <b>centred moving average</b>'}. Smoothing removes the side-to-side wobble produced by the sinusoidal body wave, which would otherwise be read as continuous turning. See the note on filter choice below.</li>
 <li>Worms shorter than <b>${fmt(c.minFrames)} frames</b> or with a path shorter than <b>${fmt(c.minPath)} px</b> are excluded, so animals that never moved do not contribute a spurious rate of zero.</li>
 </ul>
 
@@ -5406,7 +5852,10 @@ function renderMethods() {
 <h3>Navigation relative to a gradient</h3>
 <p>These analyses need to know where the cue is. With a point source, the <b>bearing</b> follows Kramer et al. (2026): θ is the angle between the animal's direction of movement and the direction to the source, and the bearing is reported as <b>cos θ</b>, so +1 is heading straight at the source and −1 straight away from it. With a linear gradient you can instead give a fixed direction and the same definition applies to that axis.</p>
 <h4>Turn rate versus bearing — the biased random walk</h4>
-<p>Time is accumulated into ${c.navBins} equal bins of cos θ, and each reorientation is assigned to the bin its bearing occupied in the sample before the turn began. Rate is events ÷ time within a bin, so bins the animal rarely occupied are not over-counted. A worm performing a biased random walk turns <i>less</i> when it is already heading up-gradient, so the curve slopes downward. Each replicate also gets a least-squares slope of rate on cos θ, and it is those slopes that are compared across conditions — the same logic as comparing regression slopes between groups. A slope indistinguishable from zero means no directional bias in turning, whatever the overall turn rate is.</p>
+<p>The selectable Legacy calculation retains adjacent-interval event bearings and the all-time denominator. The selected bearing curve uses Method B events, independently of the primary detector used by other analyses. Detector thresholds and event spans are unchanged by bearing settings. Estimated onset is the first threshold-crossing timestamp in a span; this is not an independently annotated biological onset.</p>
+<p>Current heading mode: <b>${c.bearingEstimator}</b>. Regression fits X(t) and Y(t) separately on unsmoothed, quality-filtered coordinates at the existing resampled timestamps (detector smoothing is unchanged) in [onset − ${c.bearingExclude} − ${c.bearingWindow}, onset − ${c.bearingExclude}] seconds. Direction is atan2(dY/dt, dX/dt); the source vector is evaluated at the mean position of those observations. Minimum displacement ${c.bearingMinDisp} ${c.bearingUnits}, fitted speed ${c.bearingMinSpeed} ${c.bearingUnits}/s, straightness ${c.bearingStraight}, ${c.bearingMinObs} observations, coverage ${c.bearingCoverage}, maximum raw or resampled gap ${c.bearingMaxGap} s. Missing calibration, insufficient temporal resolution and failed quality checks yield an unassignable bearing, retaining the original event count.</p>
+<p>Exposure mode: <b>${c.bearingExposure}</b>. Eligible mode excludes [first crossing, sample after last crossing) and any remaining refractory time through peak time + refractory. Events must have eligible onset immediately before their own turn; the same pre-window quality and previous-turn exclusions are used for observation time. Exposure intervals are split at turn/refractory boundaries, with heading estimated at each interval start. No window is filled with invented subsecond samples. Event assignment is a discrete onset measurement and exposure bearing is held constant over each sampled interval.</p>
+<p>For each of ${c.navBins} equal cos θ bins, plate rate = pooled worm events ÷ pooled eligible time, multiplied by the displayed rate-unit factor (60 for events/minute). The primary curve shows mean ± SEM of independent plate rates. Missing exposure yields an undefined rate; a zero event count with positive exposure yields zero. Pooled and unweighted worm curves are diagnostic options. Plate slopes are unweighted least squares across at least three supported bin centres. Genotype comparisons use plates, including an optional day-adjusted OLS model with HC1 robust errors when day IDs identify an estimable design. This is a binned-rate slope analysis; it is not a Poisson or negative-binomial interaction model.</p>
 <h4>Weathervaning — gradual steering</h4>
 <p>The second navigation mechanism (Iino &amp; Yoshida 2009) is a slow curve rather than a turn. Using only samples <i>outside</i> detected reorientations, the signed curving rate is plotted against the signed bearing β, where β is the angle you would have to turn (counter-clockwise positive) to face the source. If the animal steers toward the cue, the curving rate rises with β — it turns left when the source is to its left — so the slope through the origin is positive. Restricting the analysis to |β| below some limit avoids mixing in the geometry of animals pointing almost backwards.</p>
 <h4>Are the reorientations aimed?</h4>

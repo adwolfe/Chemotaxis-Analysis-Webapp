@@ -17,8 +17,9 @@ step; it runs entirely in the browser, works offline, and your data never leaves
 1. Open the link above, or download `index.html` and double-click it.
 2. On the **Tracks** tab, drag your CSV or `.xlsx` files onto the drop zone — one file per plate.
 3. On **Data & groups**, add a second condition and drop its files in.
-4. On **Analysis settings**, set the **frame rate** (fps) and the **scale** (pixels per mm). Without
-   them the app still works, but time is counted in frames and distance in pixels.
+4. On **Analysis settings**, set fallback **frame rate** (fps) and **scale** (pixels per mm).
+   Each file uses its own calibration metadata or overrides by default; edit overrides, plate IDs and
+   experimental days on **Data & groups**. Regression bearing assignment requires an FPS value.
 5. Go back to **Tracks** and move the threshold sliders until the marks land on the turns you can
    actually see. That calibration step is the analysis; everything downstream follows from it.
 
@@ -52,6 +53,13 @@ you the percentage of rows carrying each code and lets you choose which to keep 
   (*the default*).
 - **Method C** — posture-based, when centerlines are available: body-axis sign flips give reversals,
   tip-to-tip collapse relative to body length gives omega turns.
+
+**Bearing analysis.** Navigation now separates Method B detection from pre-turn heading assignment.
+The default is a 3 s regression window ending 1 s before estimated onset, configurable heading quality,
+eligible-run exposure, five bearing bins, plate pooling, and plate slope comparisons with optional day
+adjustment. Rejected bearings retain their detected-event counts. Legacy assignment and exposure,
+side-by-side curves, individual-event inspection, sensitivity/downsampling checks and auditable exports
+are available. See [the bearing analysis methods and validation notes](docs/bearing-analysis.md).
 
 **Everything else**
 
@@ -147,6 +155,8 @@ Any current Chrome, Edge, Firefox (113+) or Safari (16.4+). Reading `.xlsx` need
 ```
 index.html    the entire application
 README.md     this file
+docs/         bearing methods, calibration, export and validation notes
+tests/        numerical regression tests and optional browser integration test
 ```
 
 ## Citing
