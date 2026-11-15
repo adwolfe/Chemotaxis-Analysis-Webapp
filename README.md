@@ -82,50 +82,6 @@ and the control does not", which is stronger than the two merely differing.
 
 ---
 
-## The salt gradient model
-
-The field is modelled as a point bolus diffusing in a thin agar layer:
-
-```
-C(r,t) = C_background + Σ_drops  1e6 · N / (4·π·D·t·h) · exp( −r² / (4·D·t) )      mM
-
-N   = (stock_mM / 1000) · (volume_µL / 1e6)            moles of NaCl in the drop
-h   = agar_volume_mL / (π · plate_radius_mm²) · 100    agar height, cm
-D25 = 1.516e-5 cm²·s⁻¹                                 NaCl in water at 25 °C,
-                                                       Robinson & Stokes (1951)
-D   = D25 · (T/298.15) · (η(25°C)/η(T))                Stokes–Einstein, with the water
-                                                       viscosity of Kestin et al. (1978)
-t   = seconds since that drop was placed
-      (+ a²/4D if a non-zero drop radius a is given)
-```
-
-`1e6·N/(4πDth)` is the thin-layer solution of the diffusion equation: integrating `C·h` over the
-plate returns exactly the moles that were pipetted onto it, and the app reports that mass balance
-next to the model rather than asserting it. Set the **assay temperature** — a plate run at 20 °C
-diffuses about 13% more slowly than the 25 °C table value, so D = 1.324e-5 cm²·s⁻¹ there — or enter
-a D of your own.
-
-Four caveats belong in a methods section: the model has no plate wall, so for overnight gradients
-(√(4Dt) ≈ 2 cm at 18 h) the true field near the rim is higher than modelled; the thin-layer limit
-needs √(Dt) ≫ h, so the first minutes after a drop are underestimated; published D values are for
-water at a stated temperature and agar adds tortuosity, so vary D by ±10% if a conclusion rests on
-absolute concentrations; and the percentage-change axis divides by the local concentration, so
-samples below 0.05 mM are dropped from it.
-
-Nothing in it is fitted to behaviour. Single-Gaussian, exponential and linear-ramp alternatives are
-selectable so a result can be shown not to depend on the shape of the model. The **Methods** tab
-prints the formula, the live JavaScript, and a standalone Python file with your own parameters baked
-in — download it and check the numbers independently.
-
-Two more things worth knowing before quoting salt results: ΔC and dC/dt are *differences*, so the
-assumed background concentration cancels exactly, while the percentage-change axis divides by
-concentration and inherits it. A slope against ΔC or dC/dt is a statement about klinokinesis only —
-weathervaning is measured separately on the Navigation tab — and which sign counts as "correct"
-depends on the conditioning, since salt-starved animals avoid the concentration they were
-conditioned at. And concentration is one-to-one with distance from the drop, so a rate-versus-C plot
-is also a map of where the animal was — which is what the no-gradient control is for.
-
----
 
 ## Exports
 
