@@ -152,16 +152,17 @@ td.n,th.n{text-align:right;font-variant-numeric:tabular-nums;font-family:var(--m
       <button data-tab="speed"><span class="num">3</span> Speed &amp; distance</button>
       <button data-tab="iri"><span class="num">4</span> Runs</button>
       <button data-tab="nav"><span class="num">5</span> Navigation</button>
-      <button data-tab="roam"><span class="num">6</span> Roaming &amp; dwelling</button>
-      <button data-tab="time"><span class="num">7</span> Time course</button>
-      <button data-tab="salt"><span class="num">8</span> Salt gradient</button>
-      <button data-tab="saltresp"><span class="num">9</span> Salt response</button>
-      <button data-tab="gradmap"><span class="num">10</span> Gradient map</button>
-      <button data-tab="data"><span class="num">11</span> Data &amp; groups</button>
-      <button data-tab="params"><span class="num">12</span> Analysis settings</button>
-      <button data-tab="methods"><span class="num">13</span> Methods</button>
-      <button data-tab="export"><span class="num">14</span> Import &amp; export</button>
-      <button data-tab="guide"><span class="num">15</span> Guide for beginners</button>
+      <button data-tab="rose"><span class="num">6</span> Heading rose</button>
+      <button data-tab="roam"><span class="num">7</span> Roaming &amp; dwelling</button>
+      <button data-tab="time"><span class="num">8</span> Time course</button>
+      <button data-tab="salt"><span class="num">9</span> Salt gradient</button>
+      <button data-tab="saltresp"><span class="num">10</span> Salt response</button>
+      <button data-tab="gradmap"><span class="num">11</span> Gradient map</button>
+      <button data-tab="data"><span class="num">12</span> Data &amp; groups</button>
+      <button data-tab="params"><span class="num">13</span> Analysis settings</button>
+      <button data-tab="methods"><span class="num">14</span> Methods</button>
+      <button data-tab="export"><span class="num">15</span> Import &amp; export</button>
+      <button data-tab="guide"><span class="num">16</span> Guide for beginners</button>
     </nav>
     <div style="margin-top:14px;padding:0 8px">
       <button class="btn sm" id="themeBtn" style="width:100%;justify-content:center">Toggle theme</button>
@@ -238,7 +239,8 @@ td.n,th.n{text-align:right;font-variant-numeric:tabular-nums;font-family:var(--m
           </div>
         </div>
         <div class="row" style="margin-top:12px;border-top:1px solid var(--line);padding-top:11px">
-          <div style="min-width:165px"><label class="f">Show reorientations</label>
+          <div style="align-self:flex-end;padding-bottom:7px"><label class="chk"><input type="checkbox" id="trkMarkOn" checked> Show reorientation marks</label></div>
+          <div style="min-width:165px" id="trkMarkBox"><label class="f">Which method</label>
             <select id="trkMark"><option value="A">Method A only</option><option value="B" selected>Method B only</option><option value="C">Method C only</option><option value="both">A + B</option><option value="all">All methods</option><option value="none">None</option></select></div>
           <div style="min-width:165px"><label class="f">Method used for the stats</label>
             <select id="primary"><option value="A">A — pirouette</option><option value="B" selected>B — heading change</option><option value="C">C — posture (reversals + omega)</option></select></div>
@@ -341,7 +343,7 @@ td.n,th.n{text-align:right;font-variant-numeric:tabular-nums;font-family:var(--m
           <div class="row" style="margin-bottom:10px">
             <label class="chk"><input type="checkbox" id="axAuto" checked> Auto range (pooled over all conditions)</label>
             <label class="chk"><input type="checkbox" id="axEqual" checked> Equal aspect ratio</label>
-            <label class="chk"><input type="checkbox" id="axFlipY" checked> Flip Y (image coordinates)</label>
+            <label class="chk"><input type="checkbox" id="axFlipY"> Flip Y (image coordinates)</label>
             <label class="chk"><input type="checkbox" id="axOrigin"> Align all tracks to a common start point</label>
           </div>
           <div class="grid g4">
@@ -476,6 +478,34 @@ td.n,th.n{text-align:right;font-variant-numeric:tabular-nums;font-family:var(--m
     <div class="card"><h3>Per-replicate values</h3><div class="scroll" id="navTable"></div></div>
   </section>
 
+  <!-- ============ HEADING ROSE ============ -->
+  <section class="tab" id="tab-rose">
+    <div class="head">
+      <h2>Heading rose</h2>
+      <p>Where was the animal pointing? A heading is a direction, not a number on a line — 359° and 1° are neighbours — so the distribution is drawn on a circle and summarised with the <b>mean vector</b>: its direction is the circular mean, and its length <b>R</b> runs from 0 (no preferred direction) to 1 (always the same way).</p>
+      <p>Read in plate coordinates it shows any directional bias of the rig; read relative to the cue it shows whether the animals spent their time pointing up the gradient. The version taken after each reorientation asks a sharper question: does a turn leave the animal aimed better than chance?</p>
+    </div>
+    <div class="card">
+      <div class="row">
+        <div style="min-width:280px"><label class="f">Angles measured</label>
+          <select id="roseMode">
+            <option value="plate">In plate coordinates, time-weighted</option>
+            <option value="bearing">Relative to the cue, time-weighted</option>
+            <option value="postturn">In plate coordinates, after each reorientation</option>
+            <option value="postturn_bearing">Relative to the cue, after each reorientation</option>
+          </select></div>
+        <div style="min-width:150px"><label class="f">Sectors</label>
+          <input type="number" id="roseBins" value="24" step="2" min="6" max="72"></div>
+        <div style="min-width:150px"><label class="f">Panel size <span class="hint">px</span></label>
+          <input type="number" id="roseSize" value="420" step="20" min="240" max="900"></div>
+        <div style="align-self:flex-end;padding-bottom:2px"><label class="chk"><input type="checkbox" id="roseOverlay"> All conditions on one rose</label></div>
+      </div>
+    </div>
+    <div id="roseFigs"><div class="empty">Load data first.</div></div>
+    <div class="card"><h3>Circular statistics</h3><div id="roseStats"></div></div>
+    <div class="card"><h3>Per-replicate values</h3><div class="scroll" id="roseTable"></div></div>
+  </section>
+
   <!-- ============ ROAMING & DWELLING ============ -->
   <section class="tab" id="tab-roam">
     <div class="head">
@@ -537,7 +567,7 @@ td.n,th.n{text-align:right;font-variant-numeric:tabular-nums;font-family:var(--m
     <div class="head">
       <h2>Salt gradient</h2>
       <p>A chemotaxis plate has no salt sensor in it, so the gradient has to be <b>modelled</b>. A drop of concentrated NaCl placed on the agar spreads by diffusion, and the concentration it leaves behind depends only on how much salt was in the drop, how long ago it was placed, how thick the agar is, and how far away you are from it. Set the plate and the drops here once and every salt analysis in the app — the response plots, the map, the exported numbers — follows from it.</p>
-      <p>The default model and its constants are the ones used in the lab's own simulation notebook, so the field you see here is the field you would get there. The exact formula, the code that runs it and a standalone Python copy are at the bottom of the <b>Methods</b> tab.</p>
+      <p>The geometry and the constants are the ones used in the lab's own simulation notebook; the normalisation is not — the notebook's &#8730;(4&#960;hDt) does not conserve salt, so the app uses the thin-layer solution 10<sup>6</sup>N/(4&#960;Dth) instead and checks it by integrating the field back to the moles that were pipetted on. Concentrations are therefore <b>not</b> the notebook's numbers. The exact formula, the code that runs it and a standalone Python copy are at the bottom of the <b>Methods</b> tab.</p>
     </div>
     <div class="card">
       <h3>Plate and agar</h3>
@@ -557,10 +587,29 @@ td.n,th.n{text-align:right;font-variant-numeric:tabular-nums;font-family:var(--m
           <input type="number" id="saltBg" value="1" step="any"></div>
         <div style="min-width:160px"><label class="f">Drop stock <span class="hint">mM NaCl</span></label>
           <input type="number" id="saltStock" value="5000" step="any" min="0"></div>
-        <div style="min-width:190px"><label class="f">Diffusion coefficient <span class="hint">cm²·s⁻¹</span></label>
-          <input type="number" id="saltD" value="1.516e-5" step="any" min="0"></div>
         <span class="tag" id="saltHTag"></span>
       </div>
+      <div class="row" style="margin-top:12px;border-top:1px solid var(--line);padding-top:12px">
+        <div style="min-width:170px"><label class="f">Assay temperature <span class="hint">°C</span></label>
+          <input type="number" id="saltTemp" value="20" step="any" min="-5" max="45"></div>
+        <div style="min-width:230px"><label class="f">Diffusion coefficient</label>
+          <select id="saltDmode">
+            <option value="auto">from the temperature (recommended)</option>
+            <option value="manual">entered by hand</option>
+          </select></div>
+        <div style="min-width:190px" id="saltD25Box"><label class="f">D of NaCl at 25 °C <span class="hint">cm²·s⁻¹</span></label>
+          <input type="number" id="saltD25" value="1.516e-5" step="any" min="0"></div>
+        <div style="min-width:190px" id="saltDBox"><label class="f">D at the assay <span class="hint">cm²·s⁻¹</span></label>
+          <input type="number" id="saltD" value="1.324e-5" step="any" min="0"></div>
+        <div style="min-width:180px"><label class="f">Drop radius <span class="hint">mm · 0 = point source</span></label>
+          <input type="number" id="saltDropR" value="0" step="any" min="0"></div>
+        <span class="tag" id="saltDTag"></span>
+      </div>
+      <div class="note">Diffusion coefficients are quoted for water at 25 °C, but a plate run at 20 °C
+        diffuses about 13% more slowly; the app rescales D by T/η(T) (Stokes–Einstein, with the water
+        viscosity of Kestin et al. 1978) unless you enter a value yourself. A non-zero drop radius
+        replaces the instantaneous point source with a disc of that size, by starting its clock at
+        a²/4D rather than at zero.</div>
       <div class="note">Agar height is computed from the volume and the plate area, exactly as in the notebook: 8 mL in a 50 mm plate gives 0.4074 cm. The diffusion coefficient for NaCl is from Robinson &amp; Stokes (1951).</div>
     </div>
     <div class="card">
@@ -786,6 +835,13 @@ td.n,th.n{text-align:right;font-variant-numeric:tabular-nums;font-family:var(--m
         <div>
           <label class="f">Spatial scale <span class="hint">pixels / mm</span></label>
           <input type="number" id="pxmm" placeholder="leave blank → use pixels" step="any" min="0">
+        </div>
+        <div>
+          <label class="f">Distance axes <span class="hint">what the plots show</span></label>
+          <select id="unitMode">
+            <option value="auto">Millimetres, when a scale is set</option>
+            <option value="px">Pixels, even when a scale is set</option>
+          </select>
         </div>
         <div>
           <label class="f">Rate units for plots</label>
@@ -1478,11 +1534,18 @@ const ST = { conds: [], nextId: 1, qualCodes: new Set(), qualOn: new Set(), anal
 function cfg() {
   const num = (id, d) => { const v = parseFloat($(id).value); return isFinite(v) ? v : d; };
   const raw = (id) => { const v = parseFloat($(id).value); return isFinite(v) && v > 0 ? v : null; };
-  const fps = raw('fps'), pxmm = raw('pxmm');
+  const fps = raw('fps'), pxmmRaw = raw('pxmm');
+  /* The scale is one thing and the units you want to read are another: a calibrated
+     recording can still be plotted in pixels. mmPerUnit carries the conversion for the
+     parts that are physical whatever the axes say — the salt model, above all. */
+  const uMode = $('unitMode') ? $('unitMode').value : 'auto';
+  const useMM = !!pxmmRaw && uMode !== 'px';
+  const pxmm = useMM ? pxmmRaw : null;
   return {
-    fps, pxmm,
+    fps, pxmm, pxmmRaw, unitMode: uMode,
     hasTime: !!fps, hasSpace: !!pxmm,
     F: fps || 1, K: pxmm || 1,
+    mmPerUnit: useMM ? 1 : (pxmmRaw ? 1 / pxmmRaw : NaN),
     tUnit: fps ? 's' : 'frames', sUnit: pxmm ? 'mm' : 'px',
     rateUnit: $('rateUnit').value,
     smoothWin: Math.max(1, Math.round(num('smoothWin', 5))),
@@ -2007,7 +2070,10 @@ function saltCfg() {
     model: sel('saltModel', 'drops'),
     bg: num('saltBg', 1), stock: num('saltStock', 5000),
     plateDia: Math.max(1, num('saltPlateDia', 50)), agarVol: Math.max(.1, num('saltAgarVol', 8)),
-    D: Math.max(1e-9, num('saltD', 1.516e-5)), drops,
+    D25: Math.max(1e-9, num('saltD25', 1.516e-5)),
+    temp: num('saltTemp', 20), dMode: sel('saltDmode', 'auto'),
+    dManual: Math.max(1e-9, num('saltD', 1.324e-5)),
+    dropR: Math.max(0, num('saltDropR', 0)), drops,
     peak: num('saltPeak', 45), sigma: Math.max(.1, num('saltSigma', 12)),
     lambda: Math.max(.1, num('saltLambda', 12)), ramp: num('saltRamp', 1.8),
     live: sel('saltClock', 'start') === 'live',
@@ -2026,19 +2092,44 @@ function saltCfg() {
 /* agar height in cm, from the volume poured and the area of the plate */
 function agarHeight(sc) { const r = sc.plateDia / 2; return sc.agarVol / (Math.PI * r * r) * 100; }
 
+/* Viscosity of water in mPa·s (Kestin, Sokolov & Wakeham 1978), used only to carry the
+   diffusion coefficient from the temperature it was measured at to the temperature of
+   the experiment. */
+function waterVisc(T) {
+  const e = (1.1709 * (20 - T) - 0.001827 * (T - 20) * (T - 20)) / (T + 89.93);
+  return 1.002 * Math.pow(10, e);
+}
+/* Stokes–Einstein scaling: D ∝ T / η(T). The published NaCl value is for water at 25 °C,
+   so running a plate at 20 °C already costs about 13% of it. */
+function dAtTemp(D25, T) { return D25 * ((T + 273.15) / 298.15) * (waterVisc(25) / waterVisc(T)); }
+function saltD(sc) { return sc.dMode === 'manual' ? sc.dManual : dAtTemp(sc.D25, sc.temp); }
+
 /* concentration in mM at r cm from the spot; tAdd seconds of extra ageing */
 function saltAt(r, sc, tAdd) {
   if (sc.model === 'gauss') return sc.bg + sc.peak * Math.exp(-(r * r) / (2 * Math.pow(sc.sigma / 10, 2)));
   if (sc.model === 'exp') return sc.bg + sc.peak * Math.exp(-r / (sc.lambda / 10));
   if (sc.model === 'linear') return Math.max(0, sc.bg + sc.peak - sc.ramp * r * 10);
-  const h = agarHeight(sc), D = sc.D;
+  /* A bolus spreading sideways through a layer of thickness h is two-dimensional
+     diffusion: the areal density is a 2-D Gaussian, N/(4πDt), and dividing by h turns it
+     into a concentration. 1e6 converts mol·cm⁻³ to mM. Integrating C·h over the plate
+     returns N exactly, which is the check that the normalisation is right. */
+  const h = agarHeight(sc), D = saltD(sc);
+  const a2 = Math.pow(sc.dropR / 10, 2);            // finite drop radius, cm²
   let C = sc.bg;
   for (const d of sc.drops) {
-    const t = d.t + (tAdd || 0); if (t <= 0) continue;
+    const t = d.t + (tAdd || 0) + (a2 > 0 ? a2 / (4 * D) : 0); if (t <= 0) continue;
     const N = (sc.stock / 1000) * (d.vol / 1e6);
-    C += 1e6 * N / Math.sqrt(4 * Math.PI * h * D * t) * Math.exp(-(r * r) / (4 * D * t));
+    C += 1e6 * N / (4 * Math.PI * D * t * h) * Math.exp(-(r * r) / (4 * D * t));
   }
   return C;
+}
+/* Numerical mass balance, reported in the Methods: ∫ C·h dA over the plate, in moles. */
+function saltMassCheck(sc, tAdd) {
+  const h = agarHeight(sc), rMax = sc.plateDia / 10 * 3, dr = rMax / 4000;
+  let sum = 0;
+  for (let r = dr / 2; r < rMax; r += dr) sum += (saltAt(r, sc, tAdd) - sc.bg) / 1e6 * h * 2 * Math.PI * r * dr;
+  const N = sc.drops.reduce((a, d) => a + (sc.stock / 1000) * (d.vol / 1e6), 0);
+  return { recovered: sum, expected: N, ratio: N > 0 ? sum / N : NaN };
 }
 const saltPeakC = (sc, tAdd) => saltAt(0, sc, tAdd);
 /* distance in cm at which the field falls to C; the field is monotone in r, so bisect */
@@ -2060,20 +2151,23 @@ function saltRadiusAt(C, sc, tAdd, rMax) {
    A condition marked "no gradient" is run through exactly the same code against the
    position the spot would have occupied: that is the control, and it answers the
    objection that a relationship could be manufactured by the shape of the tracks. */
+/* Below this concentration the percentage-change axis is meaningless — a vanishing
+   denominator makes it diverge — so those samples are left out of that measure only. */
+const SALT_PCT_FLOOR = 0.05;        // mM
 function addSalt(w, c, sc, geom) {
   w.salt = null;
-  if (!w.ok || !geom || geom.mode !== 'point' || !c.hasSpace) return;
+  if (!w.ok || !geom || geom.mode !== 'point' || !isFinite(c.mmPerUnit)) return;
   const n = w.n, dt = w.dt, t0 = w.ts[0];
   const C = new Array(n).fill(null), r = new Array(n).fill(null);
   for (let i = 0; i < n; i++) { if (w.xs[i] == null) continue;
-    const dmm = Math.hypot(w.xs[i] - geom.x, w.ys[i] - geom.y);
+    const dmm = Math.hypot(w.xs[i] - geom.x, w.ys[i] - geom.y) * c.mmPerUnit;
     r[i] = dmm; C[i] = saltAt(dmm / 10, sc, sc.live ? (w.ts[i] - t0) : 0); }
   const step = Math.max(1, Math.round(sc.win / dt));
   const d1 = new Array(n).fill(null), dC = new Array(n).fill(null),
     dCdt = new Array(n).fill(null), pct = new Array(n).fill(null);
   for (let i = 1; i < n; i++) { if (C[i] == null || C[i - 1] == null) continue;
     d1[i] = C[i] - C[i - 1]; dCdt[i] = d1[i] / dt;
-    if (C[i - 1] > 0) pct[i] = 100 * d1[i] / C[i - 1]; }
+    if (C[i - 1] > SALT_PCT_FLOOR) pct[i] = 100 * d1[i] / C[i - 1]; }
   for (let i = step; i < n; i++) { if (C[i] == null || C[i - step] == null) continue; dC[i] = C[i] - C[i - step]; }
   const def = C.filter(v => v != null);
   w.salt = { C, r, d1, dC, dCdt, pct, step, win: step * dt, noGrad: !!geom.noGrad,
@@ -2148,6 +2242,120 @@ function poolSalt(conds, field, cap) {
   const stride = Math.ceil(out.length / lim), thin = [];
   for (let i = 0; i < out.length; i += stride) thin.push(out[i]);
   return thin;
+}
+
+/* ============================================================================
+   4e. heading angles — circular statistics and the rose plot
+   ----------------------------------------------------------------------------
+   Headings are directions, so they are summarised with the resultant vector, not
+   with a mean and an SD: R = |Σ e^{iθ}| / n is 0 for a uniform spread and 1 when
+   every sample points the same way, and the Rayleigh test asks whether an R that
+   large could have come from a uniform distribution.
+   ========================================================================== */
+const DEG = Math.PI / 180;
+function circStats(angles, weights) {
+  const n = angles.length;
+  if (!n) return { n: 0, R: NaN, mu: NaN, p: NaN, W: 0 };
+  let sx = 0, sy = 0, W = 0;
+  for (let i = 0; i < n; i++) {
+    const w = weights ? weights[i] : 1;
+    sx += w * Math.cos(angles[i] * DEG); sy += w * Math.sin(angles[i] * DEG); W += w;
+  }
+  if (!W) return { n, R: NaN, mu: NaN, p: NaN, W: 0 };
+  const R = Math.hypot(sx, sy) / W;
+  const mu = Math.atan2(sy, sx) / DEG;
+  /* Rayleigh test, with the small-sample correction of Zar (1999). Weighted samples
+     are not independent, so the effective n is the sample count, not the total weight. */
+  const Z = n * R * R;
+  const p = n > 1 ? Math.exp(Math.sqrt(1 + 4 * n + 4 * (n * n - Z * n)) - (1 + 2 * n)) : NaN;
+  return { n, R, mu: ((mu % 360) + 360) % 360, p: clampNum(p, 0, 1), Z, W };
+}
+/* The angles a worm contributes, in the frame the user asked for. */
+function headingAngles(w, c, mode) {
+  const out = { ang: [], wt: [] };
+  if (!w.ok) return out;
+  const ev = c.primary === 'C' ? w.evC : c.primary === 'B' ? w.evB : w.evA;
+  const rel = mode === 'bearing' || mode === 'postturn_bearing';
+  if (rel && !w.nav) return out;
+  const push = (i, weight) => {
+    if (i == null || i < 0 || i >= w.n) return;
+    if (w.head[i] == null) return;
+    let a = w.head[i];
+    if (rel) { if (w.nav.beta[i] == null) return; a = w.nav.beta[i]; }   // 0 = heading at the source
+    out.ang.push(a); out.wt.push(weight);
+  };
+  if (mode === 'postturn' || mode === 'postturn_bearing') {
+    ev.forEach(e => push(Math.min(w.n - 2, e.span[1] + 1), 1));
+  } else {
+    for (let i = 0; i < w.n - 1; i++) push(i, w.dt);
+  }
+  return out;
+}
+function roseBins(ang, wt, nb) {
+  const bins = new Array(nb).fill(0);
+  let tot = 0;
+  for (let i = 0; i < ang.length; i++) {
+    const a = ((ang[i] % 360) + 360) % 360;
+    const k = clampNum(Math.floor(a / 360 * nb), 0, nb - 1);
+    bins[k] += wt ? wt[i] : 1; tot += wt ? wt[i] : 1;
+  }
+  return { bins, tot, frac: bins.map(v => tot ? v / tot : 0) };
+}
+
+/* ---------- the plot ---------- */
+function roseFig(title, groups, opt) {
+  const W = opt.size || 420, H = W + 54;
+  const fig = new Fig(W, H, title);
+  const cx = W / 2, cy = (W - 10) / 2 + 26, R = Math.min(cx, cy) - 52;
+  fig.text(10, 16, title, { size: 12, weight: 'bold', fill: INK.text });
+  const nb = opt.nb || 24;
+  const maxF = Math.max(1e-6, isFinite(opt.rMax) ? opt.rMax : maxOf(groups.flatMap(g => g.frac)));
+  const rings = niceTicks(0, maxF * 100, 3).filter(v => v > 0);
+  const rMax = Math.max(maxF, rings.length ? rings[rings.length - 1] / 100 : maxF);
+  const rr = f => R * Math.sqrt(Math.max(0, f) / rMax);      // area-true radius
+  /* grid */
+  rings.forEach(v => { const r = rr(v / 100);
+    fig.circle(cx, cy, r, { stroke: INK.grid, sw: .8 });
+    fig.text(cx + 4, cy - r + 9.5, v + '%', { size: 8.5, fill: INK.tick }); });
+  fig.circle(cx, cy, R, { stroke: INK.axis, sw: 1.1 });
+  for (let a = 0; a < 360; a += 45) {
+    const t = a * DEG;
+    fig.line(cx, cy, cx + R * Math.cos(t), cy - R * Math.sin(t), { stroke: INK.grid, sw: .8 });
+    const lab = opt.labels ? (opt.labels[a] || '') : (a + '°');
+    if (lab) {
+      const cs = Math.cos(t), sn = Math.sin(t);
+      const anchor = cs > .3 ? 'start' : cs < -.3 ? 'end' : 'middle';
+      fig.text(cx + (R + 7) * cs, cy - (R + 7) * sn + (sn < -.3 ? 9 : sn > .3 ? -2 : 3.4), lab,
+        { size: 9.5, anchor, fill: INK.tick });
+    }
+  }
+  /* wedges */
+  groups.forEach(g => {
+    g.frac.forEach((f, k) => {
+      if (!f) return;
+      const a0 = (k / nb) * 360 * DEG, a1 = ((k + 1) / nb) * 360 * DEG, r = rr(f);
+      const pts = [[cx, cy]];
+      for (let i = 0; i <= 8; i++) { const t = a0 + (a1 - a0) * i / 8;
+        pts.push([cx + r * Math.cos(t), cy - r * Math.sin(t)]); }
+      pts.push([cx, cy]);
+      fig.poly(pts, { fill: g.color, op: groups.length > 1 ? .34 : .5, stroke: g.color, sw: .7 });
+    });
+  });
+  /* mean vectors */
+  groups.forEach(g => {
+    if (!isFinite(g.mu) || !isFinite(g.R)) return;
+    const t = g.mu * DEG, r = R * g.R;
+    fig.line(cx, cy, cx + r * Math.cos(t), cy - r * Math.sin(t), { stroke: '#ffffff', sw: 4.2, op: .85 });
+    fig.line(cx, cy, cx + r * Math.cos(t), cy - r * Math.sin(t), { stroke: g.color, sw: 2.2 });
+    fig.circle(cx + r * Math.cos(t), cy - r * Math.sin(t), 3, { fill: g.color, stroke: '#ffffff', sw: .8 });
+  });
+  fig.circle(cx, cy, 2, { fill: INK.axis });
+  if (groups.length > 1)
+    legendRow(fig, groups.map(g => ({ label: g.name, color: g.color })), H - 14, 10, W - 10);
+  else if (groups.length === 1 && isFinite(groups[0].R))
+    fig.text(W / 2, H - 14, `R = ${fmt(groups[0].R, 3)} · mean ${fmt(groups[0].mu, 3)}° · Rayleigh ${fmtP(groups[0].p)}`,
+      { size: 10, anchor: 'middle', fill: INK.tick });
+  return fig;
 }
 
 /* ============================================================================
@@ -2605,6 +2813,8 @@ function strokeArcInBox(fig, cx, cy, r, B, style) {
 }
 function fieldTrackFig(title, tracks, dom, opt) {
   const sc = opt.sc, tAdd = opt.tAdd || 0, src = opt.source;
+  const mmU = isFinite(opt.mmPerUnit) && opt.mmPerUnit > 0 ? opt.mmPerUnit : 1;   // mm per data unit
+  const toData = cm => cm * 10 / mmU, toMM = d => d * mmU;
   const cbarOn = opt.cbar !== false;
   const legN = (opt.legend && opt.legend.length) ? opt.legend.length : 0;
   const pad = { l: 56, r: cbarOn ? 88 : 16, t: 26, b: legN ? 70 : 46 };
@@ -2628,7 +2838,7 @@ function fieldTrackFig(title, tracks, dom, opt) {
   if (src) {
     rFar = maxOf(corners.map(p => Math.hypot(p[0] - src.x, p[1] - src.y))) || 1;
     const rNear = Math.hypot(clamp(src.x, xd[0], xd[1]) - src.x, clamp(src.y, yd[0], yd[1]) - src.y);
-    cHi = saltAt(rNear / 10, sc, tAdd); cLo = saltAt(rFar / 10, sc, tAdd);
+    cHi = saltAt(toMM(rNear) / 10, sc, tAdd); cLo = saltAt(toMM(rFar) / 10, sc, tAdd);
     if (cHi > cLo) T = saltScaleFns(opt.scale || 'log', cLo, cHi);
   }
   const nb = sc.bands, ramp = opt.rampName || 'grey';
@@ -2637,7 +2847,7 @@ function fieldTrackFig(title, tracks, dom, opt) {
   if (T && ramp !== 'none') {
     fig.rect(B.x0, B.y0, bw, bh, { fill: rampColor(ramp, .5 / nb) });
     for (let k = 1; k < nb; k++) {
-      const rr = saltRadiusAt(bandAt(k), sc, tAdd, rFar / 10 * 1.05) * 10;
+      const rr = toData(saltRadiusAt(bandAt(k), sc, tAdd, toMM(rFar) / 10 * 1.05));
       if (!(rr > 0)) continue;
       const poly = [];
       for (let a = 0; a < 96; a++) { const th = a * 2 * Math.PI / 96;
@@ -2654,7 +2864,7 @@ function fieldTrackFig(title, tracks, dom, opt) {
   if (T && opt.contour !== false) {
     const placedLab = [];          // a contour label is skipped rather than stacked on another
     saltTicks(opt.scale || 'log', cLo, cHi).forEach(v => {
-      const rr = saltRadiusAt(v, sc, tAdd, rFar / 10 * 1.05) * 10;
+      const rr = toData(saltRadiusAt(v, sc, tAdd, toMM(rFar) / 10 * 1.05));
       if (!(rr > 0)) return;
       const segs = strokeArcInBox(fig, sx(src.x), sy(src.y), Math.abs(sx(src.x + rr) - sx(src.x)), B,
         { stroke: ink, sw: .75, op: .8 });
@@ -3360,15 +3570,15 @@ function renderChips(A) {
 /* ---- inputs ---- */
 const WATCH = ['fps','pxmm','rateUnit','smoothWin','smoothMethod','sgOrder','dt','minDisp','omegaThr','tcrit','methodACount','angThr','angWin','refrac',
  'primary','nUnit','errBar','barsOn','yAxisMode','maxStep','minFrames','minPath','dropZero','axAuto','axEqual','axFlipY','axOrigin',
- 'axXmin','axXmax','axYmin','axYmax','trkLayout','trkMark','trkSize','trkColor','trkStart','trkEnd',
+ 'axXmin','axXmax','axYmin','axYmax','trkLayout','trkMark','trkMarkOn','trkSize','trkColor','trkStart','trkEnd',
  'trkLW','trkOp','trkScale','trkGrid','spdMeasure','distMeasure','showEff','iriStat','iriDist','iriCensor','iriSpeed',
- 'tcMetric','tcBin','tcMode','tcNorm','tcPerCond',
+ 'tcMetric','tcBin','tcMode','tcNorm','tcPerCond','roseMode','roseBins','roseSize','roseOverlay',
  'navMode','navDir','navBins','wvBins','wvLimit','shuffleN','noGradRef','zipSource','roamBin','roamThr','showMSD','msdMaxFrac','msdRefLag',
  'mkAShape','mkASize','mkAColor','mkAWidth','mkAFill','mkBShape','mkBSize','mkBColor','mkBWidth','mkBFill',
  'mkCShape','mkCSize','mkCColor','mkCWidth','mkCFill',
  'mkSShape','mkSSize','mkSColor','mkSWidth','mkSFill','mkSAuto','mkEShape','mkESize','mkEColor','mkEWidth','mkEFill','mkEAuto',
  'mcOn','omegaRatio','revPersist','cMerge',
- 'saltModel','saltPlateDia','saltAgarVol','saltBg','saltStock','saltD','saltClock',
+ 'unitMode','saltModel','saltPlateDia','saltAgarVol','saltBg','saltStock','saltD','saltD25','saltTemp','saltDmode','saltDropR','saltClock',
  'sdV1','sdT1','sdV2','sdT2','sdV3','sdT3','sdV4','sdT4',
  'saltPeak','saltSigma','saltLambda','saltRamp','saltSpot','saltRing','saltBands','saltRampSel','saltScale',
  'saltWin','saltBins','saltBinMode','saltTrim','saltPerInt','saltTrimFig',
@@ -3650,9 +3860,9 @@ function renderAll() {
   $('startCard').style.display = hasData ? 'none' : '';
   $('trkMain').style.display = hasData ? '' : 'none';
   if (!hasData) { $('dataSummary').innerHTML = '<div class="empty">No files loaded yet.</div>';
-    ['trackFigs','diagFigs','reoFigs','spdFigs','iriFigs','tcFigs','navFigs','roamFigs','saltFigs','gmFigs'].forEach(i => $(i).innerHTML = '<div class="empty">Load data first.</div>');
+    ['trackFigs','diagFigs','reoFigs','spdFigs','iriFigs','tcFigs','navFigs','roseFigs','roamFigs','saltFigs','gmFigs'].forEach(i => $(i).innerHTML = '<div class="empty">Load data first.</div>');
     $('diagNote').innerHTML = ''; $('trackLegend').innerHTML = '';
-    ['reoStats','spdStats','iriStats','tcStats','navStats','roamStats','saltStats','reoTable','spdTable','iriTable','tcTable','navTable','roamTable','saltTable','gmTable','srcTable'].forEach(i => $(i).innerHTML = '');
+    ['reoStats','spdStats','iriStats','tcStats','navStats','roseStats','roamStats','saltStats','reoTable','spdTable','iriTable','tcTable','navTable','roseTable','roamTable','saltTable','gmTable','srcTable'].forEach(i => $(i).innerHTML = '');
     $('sideStat').textContent = ''; renderSaltModel(); renderSaltCode(); renderExport(); renderMethods(); renderGuide(); return; }
 
   const anyCL = ST.conds.some(cd => cd.files.some(f => f.hasCenterlines));
@@ -3672,7 +3882,7 @@ function renderAll() {
   renderDiagnostics(A);
   renderTracks(A);
   renderMetric(A, 'reo'); renderMetric(A, 'spd'); renderMetric(A, 'iri');
-  renderNav(A); renderRoam(A); renderTimeCourse(A);
+  renderNav(A); renderRose(A); renderRoam(A); renderTimeCourse(A);
   renderSaltModel(); renderSalt(A); renderGradMap(A); renderSaltCode();
   renderExport(); renderMethods(); renderGuide();
   $('sideStat').innerHTML = `${A.conds.length} condition${A.conds.length === 1 ? '' : 's'}<br>${A.rows.length} worms analysed`;
@@ -3821,7 +4031,11 @@ $('suggestB').onclick = () => { if (!ST.analysis) return; const { dth } = pooled
 function renderTracks(A) {
   const c = A.c, host = $('trackFigs'); host.innerHTML = '';
   const [xd, yd] = domainOf(A);
-  const align = $('axOrigin').checked, mark = $('trkMark').value, size = clamp(parseFloat($('trkSize').value) || 420, 200, 1400);
+  const align = $('axOrigin').checked, size = clamp(parseFloat($('trkSize').value) || 420, 200, 1400);
+  const markOn = $('trkMarkOn').checked;
+  $('trkMarkBox').style.opacity = markOn ? '' : '.45';
+  $('trkMark').disabled = !markOn;
+  const mark = markOn ? $('trkMark').value : 'none';
   const colorMode = $('trkColor').value;
   const M = markerCfg();
   const num = (id, d) => { const v = parseFloat($(id).value); return isFinite(v) ? v : d; };
@@ -4327,6 +4541,100 @@ function renderNav(A) {
   ST.tables['weathervaning_bins'] = { name: 'weathervaning_bins', rows: [['Condition', 'β from (deg)', 'β to (deg)', 'n', 'Mean curving rate', 'SEM'], ...wb] };
 }
 
+/* ---------- heading rose tab ---------- */
+function renderRose(A) {
+  const c = A.c, host = $('roseFigs'), statHost = $('roseStats'), tabHost = $('roseTable');
+  host.innerHTML = ''; statHost.innerHTML = ''; tabHost.innerHTML = '';
+  const mode = $('roseMode').value, nb = Math.max(6, Math.round(parseFloat($('roseBins').value) || 24));
+  const overlay = $('roseOverlay').checked;
+  const size = clamp(parseFloat($('roseSize').value) || 420, 240, 900);
+  const rel = mode === 'bearing' || mode === 'postturn_bearing';
+  if (rel && !A.conds.some(cd => cd.used.some(w => w.nav))) {
+    host.innerHTML = '<div class="empty">Bearings need a marked cue: set it on the <b>Navigation</b> tab, or switch the frame back to <b>plate coordinates</b>.</div>';
+    return;
+  }
+  const labels = rel
+    ? { 0: 'toward', 90: '+90°', 180: 'away', 270: '−90°' }
+    : { 0: '0° (+x)', 90: '90°', 180: '180°', 270: '270°' };
+
+  const per = [];                                  // one entry per replicate
+  const groups = A.conds.map(cd => {
+    const ang = [], wt = [];
+    cd.used.forEach(w => {
+      const h = headingAngles(w, c, mode);
+      if (!h.ang.length) return;
+      ang.push(...h.ang); wt.push(...h.wt);
+      const st = circStats(h.ang, h.wt);
+      per.push({ cond: cd.name, condId: cd.id, file: w.file, worm: w.id, ...st });
+    });
+    const st = circStats(ang, wt), rb = roseBins(ang, wt, nb);
+    return { name: cd.name, color: cd.color, id: cd.id, ...st, frac: rb.frac, nSamp: ang.length };
+  }).filter(g => g.nSamp);
+
+  if (!groups.length) { host.innerHTML = '<div class="empty">No headings could be measured — lower the minimum step, or raise Δt.</div>'; return; }
+
+  /* per-replicate values feed the usual comparison machinery */
+  const key = new Map(per.map(p => [p.condId + '|' + p.file + '|' + p.worm, p]));
+  A.rows.forEach(r => { const p = key.get(r.condId + '|' + r.file + '|' + r.worm);
+    r.headR = p ? p.R : NaN;
+    r.headMu = p ? p.mu : NaN;
+    r.headCos = p && isFinite(p.mu) ? Math.cos(p.mu * DEG) * p.R : NaN; });
+
+  const grid = el('div', { class: 'figgrid' });
+  const title = mode === 'postturn' ? 'Heading after a reorientation'
+    : mode === 'bearing' ? 'Heading relative to the cue'
+      : mode === 'postturn_bearing' ? 'Heading relative to the cue, after a reorientation'
+        : 'Heading, time-weighted';
+  const cap = (rel ? '0° is heading straight at the cue, 180° straight away from it. ' : 'Angles are in plate coordinates: 0° is the +x direction, counter-clockwise positive. ')
+    + (mode.startsWith('postturn') ? 'One sample per reorientation — the heading the animal left the turn with.'
+      : 'Every sample contributes, weighted by the time it represents, so the rose is the fraction of time spent heading that way.')
+    + ' The arrow is the mean vector: its direction is the circular mean and its length is R, from 0 (no preferred direction) to 1 (all the same way).';
+
+  if (overlay) {
+    grid.appendChild(figCard('heading_rose_all', roseFig(title + ' — all conditions', groups, { nb, size, labels }), cap,
+      { wide: { name: 'heading_rose_all', rows: [['bin from (deg)', 'bin to (deg)', ...groups.map(g => g.name + ' — fraction')],
+        ...groups[0].frac.map((_, k) => [k * 360 / nb, (k + 1) * 360 / nb, ...groups.map(g => g.frac[k])])] } }));
+  } else {
+    const shared = maxOf(groups.flatMap(g => g.frac));
+    groups.forEach(g => grid.appendChild(figCard('heading_rose_' + g.id,
+      roseFig(`${title} — ${g.name}`, [g], { nb, size, labels, rMax: shared }),
+      `${g.nSamp} ${mode.startsWith('postturn') ? 'reorientations' : 'samples'} · ${cap}`,
+      { wide: { name: 'heading_rose_' + safeName(g.name),
+        rows: [['bin from (deg)', 'bin to (deg)', 'fraction'], ...g.frac.map((f, k) => [k * 360 / nb, (k + 1) * 360 / nb, f])] } })));
+  }
+  host.appendChild(grid);
+
+  /* R per replicate, compared the usual way */
+  const grid2 = el('div', { class: 'figgrid' });
+  const blocks = [];
+  const panel = (k, t, field, ylab, capt) => {
+    const gs = replicates(field); if (!gs.length) return;
+    const st = statsFor(gs);
+    grid2.appendChild(figCard(k, dotFig(t, gs, ylab, st, { errBar: c.errBar, h: 300, bars: c.barsOn, yMode: c.yAxisMode }), capt,
+      { wide: wideFromGroups(k, gs) }));
+    blocks.push({ title: t, st });
+  };
+  panel('heading_concentration', 'Directedness of heading (R)', r => r.headR, 'resultant length R',
+    'One value per replicate: 0 means the animal headed every way equally, 1 means it held one course. This is a measure of how directed the path was, not of which way it went.');
+  if (rel) panel('heading_toward_cue', 'Mean heading toward the cue', r => r.headCos, 'R · cos(mean bearing)',
+    'The component of the mean vector that points at the cue, so positive means the animal spent its time heading up the gradient. Zero is the no-gradient expectation.');
+  host.appendChild(grid2);
+
+  /* numbers */
+  const rows = groups.map(g => [g.name, g.nSamp, g.R, g.mu, g.p]);
+  statHost.innerHTML =
+    '<div class="note">Rayleigh’s test asks whether a spread of directions this concentrated could have come from a uniform distribution. It is computed on the pooled samples of each condition, which are not independent of one another, so read it as a description of the pooled distribution and do the real comparison on the per-replicate R below.</div>' +
+    '<table><thead><tr><th>Condition</th><th class="n">samples</th><th class="n">R</th><th class="n">mean (deg)</th><th class="n">Rayleigh p</th><th></th></tr></thead><tbody>' +
+    rows.map(r => `<tr><td>${r[0]}</td><td class="n">${r[1]}</td><td class="n">${fmt(r[2], 3)}</td><td class="n">${fmt(r[3], 3)}</td><td class="n">${fmtP(r[4])}</td><td>${stars(r[4])}</td></tr>`).join('') +
+    '</tbody></table>' +
+    blocks.map((b, i) => `<details ${i === 0 ? 'open' : ''} style="margin-top:12px;border-top:1px solid var(--line);padding-top:10px"><summary style="cursor:pointer;font-size:13px;font-weight:600;color:var(--ink-2)">${b.title}${b.st && isFinite(b.st.primaryP) ? ` — p = ${fmtP(b.st.primaryP)} ${stars(b.st.primaryP)}` : ''}</summary><div style="margin-top:10px">${statsHTML(b.st)}</div></details>`).join('');
+  ST.tables['heading_circular_summary'] = { name: 'heading_circular_summary',
+    rows: [['Condition', 'Samples', 'R', 'Mean direction (deg)', 'Rayleigh p'], ...rows] };
+  tabHost.innerHTML = tableHTML('heading_per_replicate', 'heading_per_replicate',
+    ['Condition', 'File', 'Worm', 'n', 'R', 'Mean direction (deg)', 'Rayleigh p'],
+    per.map(p => [p.cond, p.file, p.worm, p.n, p.R, p.mu, p.p]));
+}
+
 /* ============================================================================
    8d. roaming vs dwelling
    ========================================================================== */
@@ -4388,8 +4696,14 @@ function renderSaltModel() {
   const sc = saltCfg(), host = $('saltModelFigs');
   const scale = $('saltScale') ? $('saltScale').value : 'log';
   $('saltAltBox').style.display = sc.model === 'drops' ? 'none' : '';
-  const h = agarHeight(sc);
+  const h = agarHeight(sc), Duse = saltD(sc);
   $('saltHTag').textContent = `agar ${fmt(h, 4)} cm · peak ${fmt(saltPeakC(sc, 0), 4)} mM`;
+  $('saltD25Box').style.display = sc.dMode === 'manual' ? 'none' : '';
+  $('saltDBox').style.display = sc.dMode === 'manual' ? '' : 'none';
+  if (sc.dMode !== 'manual' && document.activeElement !== $('saltD')) $('saltD').value = Duse.toExponential(4);
+  { const mb = saltMassCheck(sc, 0);
+    $('saltDTag').textContent = `D = ${Duse.toExponential(3)} cm²·s⁻¹ at ${fmt(sc.temp, 3)} °C`
+      + (isFinite(mb.ratio) ? ` · mass balance ${(100 * mb.ratio).toFixed(1)}%` : ''); }
   host.innerHTML = '';
   if (sc.model === 'drops' && !sc.drops.length) {
     host.innerHTML = '<div class="empty">Give at least one drop a volume and an age.</div>'; return; }
@@ -4421,7 +4735,8 @@ function renderSaltModel() {
       color: PALETTE[i % PALETTE.length],
       pts: Array.from({ length: 121 }, (_, k) => { const rmm = d / 2 * 1.2 * k / 120;
         const N = (sc.stock / 1000) * (dr.vol / 1e6), t = dr.t;
-        return [rmm, 1e6 * N / Math.sqrt(4 * Math.PI * h * sc.D * t) * Math.exp(-Math.pow(rmm / 10, 2) / (4 * sc.D * t))]; }) }));
+        const Dd = saltD(sc);
+        return [rmm, 1e6 * N / (4 * Math.PI * Dd * t * h) * Math.exp(-Math.pow(rmm / 10, 2) / (4 * Dd * t))]; }) }));
     if (sc.model === 'drops') grid.appendChild(figCard('salt_profile_per_drop',
       curveFig('Contribution of each drop', series, 'distance from the drop (mm)', 'added C (mM)', []),
       'An old drop has spread wide and flat; a recent one is a narrow spike. The field the animal feels is the sum, plus the salt already in the agar.',
@@ -4455,10 +4770,10 @@ function saltSetupCard(c, where) {
   }
 
   /* ---- 1. the scale ---- */
-  box.appendChild(row(c.hasSpace, 'Pixels per millimetre',
-    c.hasSpace ? `set to ${c.pxmm} px/mm — distances are in millimetres`
+  box.appendChild(row(isFinite(c.mmPerUnit), 'Pixels per millimetre',
+    isFinite(c.mmPerUnit) ? `set to ${c.pxmmRaw} px/mm${c.unitMode === 'px' ? ' — axes are shown in pixels, the model still works in mm' : ' — distances are in millimetres'}`
       : 'without this the app works in pixels, and a pixel has no concentration'));
-  if (!c.hasSpace) {
+  if (!isFinite(c.mmPerUnit)) {
     const pxInp = el('input', { type: 'number', step: 'any', min: '0', style: 'width:120px', placeholder: 'px per mm' });
     const diaInp = el('input', { type: 'number', step: 'any', min: '0', style: 'width:140px', placeholder: 'plate width in px' });
     const apply = v => { if (!(v > 0)) return; $('pxmm').value = +v.toPrecision(6); TOUCHED.add('pxmm'); schedule(); };
@@ -4534,7 +4849,7 @@ function renderSalt(A) {
   $('saltRateUnit').value = $('rateUnit').value;
   $('saltTrim').disabled = sc.binMode === 'count';
   const withSalt = A.conds.map(cd => ({ cd, ws: cd.used.filter(w => w.salt) })).filter(o => o.ws.length);
-  if (!c.hasSpace || c.navMode !== 'point' || !withSalt.length) { host.appendChild(saltSetupCard(c, 'resp')); return; }
+  if (!isFinite(c.mmPerUnit) || c.navMode !== 'point' || !withSalt.length) { host.appendChild(saltSetupCard(c, 'resp')); return; }
   if (!c.hasTime) host.appendChild(el('div', { class: 'note warn',
     html: 'No frame rate is set, so time is counted in frames and this y-axis reads <b>reorientations per 1000 frames</b> — the same fallback every other rate plot in the app is using right now. Put your frame rate in the box above and every one of them, these included, switches to <b>reorientations per minute</b>.' }));
   const noSpot = A.conds.filter(cd => cd.used.length && !cd.used.some(w => w.salt)).map(cd => cd.name);
@@ -4644,7 +4959,7 @@ function renderGradMap(A) {
   host.innerHTML = ''; tabHost.innerHTML = '';
   const spots = new Map();
   A.conds.forEach(cd => { const s = saltSpotFor(cd, c); if (s) spots.set(cd.id, s); });
-  if (!c.hasSpace || c.navMode !== 'point' || !spots.size) { host.appendChild(saltSetupCard(c, 'map')); return; }
+  if (!isFinite(c.mmPerUnit) || c.navMode !== 'point' || !spots.size) { host.appendChild(saltSetupCard(c, 'map')); return; }
   const noSpot = A.conds.filter(cd => cd.used.length && !spots.has(cd.id)).map(cd => cd.name);
   if (noSpot.length) host.appendChild(el('div', { class: 'note warn',
     html: `No salt spot is marked for <b>${noSpot.join('</b>, <b>')}</b>, so ${noSpot.length === 1 ? 'that condition has' : 'those conditions have'} no panel here.` }));
@@ -4672,8 +4987,8 @@ function renderGradMap(A) {
     yd = [Math.min(yd[0], s.y - m), Math.max(yd[1], s.y + m)]; });
 
   const plate = $('gmRing').checked && isFinite(sc.cx) && isFinite(sc.cy)
-    ? { cx: sc.cx / c.K, cy: sc.cy / c.K, dia: sc.plateDia, ring: sc.ring } : null;
-  const base = { sc: gsc, size, equal: true, flipY: $('axFlipY').checked, sUnit: c.sUnit, scale,
+    ? { cx: sc.cx / c.K, cy: sc.cy / c.K, dia: sc.plateDia / c.mmPerUnit, ring: sc.ring / c.mmPerUnit } : null;
+  const base = { sc: gsc, size, equal: true, flipY: $('axFlipY').checked, sUnit: c.sUnit, scale, mmPerUnit: c.mmPerUnit,
     rampName: gsc.rampName, contour: $('gmContour').checked, labels: $('gmLabels').checked,
     halo: $('gmHalo').checked, cbar: $('gmCbar').checked, markers: M, plate,
     scaleBar: num('trkScale', 0) > 0 ? num('trkScale', 0) : 0 };
@@ -4850,9 +5165,11 @@ function saltStandalonePy(sc) {
     '"""',
     'import math',
     '',
-    'D_NACL = ' + sc.D + '          # cm^2/s',
+    'D_NACL = ' + saltD(sc).toExponential(6) + '      # cm^2/s at ' + sc.temp + ' C',
     'PLATE_DIAMETER_MM = ' + sc.plateDia,
     'AGAR_VOLUME_ML = ' + sc.agarVol,
+    'TEMPERATURE_C = ' + sc.temp,
+    'DROP_RADIUS_MM = ' + sc.dropR + '      # 0 = instantaneous point source',
     'BACKGROUND_MM = ' + sc.bg + '         # salt already in the agar',
     'STOCK_MM = ' + sc.stock + '           # concentration of the drop',
     '',
@@ -4873,18 +5190,33 @@ function saltStandalonePy(sc) {
     '        if t <= 0:',
     '            continue',
     '        moles = (STOCK_MM / 1000.0) * (volume_ul / 1e6)',
+    '        if DROP_RADIUS_MM > 0:',
+    '            t += (DROP_RADIUS_MM / 10.0) ** 2 / (4 * D_NACL)',
     '        c += (',
     '            1e6',
     '            * moles',
-    '            / math.sqrt(4 * math.pi * AGAR_HEIGHT_CM * D_NACL * t)',
+    '            / (4 * math.pi * D_NACL * t * AGAR_HEIGHT_CM)',
     '            * math.exp(-(r_cm ** 2) / (4 * D_NACL * t))',
     '        )',
     '    return c',
     '',
     '',
+    'def mass_balance(r_max_cm=None):',
+    '    # integrate C*h over the plate; it must return the moles that went on',
+    '    r_max = r_max_cm or PLATE_DIAMETER_MM / 10.0 * 3',
+    '    dr, total = r_max / 4000.0, 0.0',
+    '    r = dr / 2',
+    '    while r < r_max:',
+    '        total += (concentration(r) - BACKGROUND_MM) / 1e6 * AGAR_HEIGHT_CM * 2 * math.pi * r * dr',
+    '        r += dr',
+    '    return total, sum(STOCK_MM / 1000.0 * v / 1e6 for v, _ in DROPS)',
+    '',
+    '',
     'if __name__ == "__main__":',
     '    for mm in (0, 5, 10, 12.5, 20, 25, 40):',
     '        print(f"{mm:6.1f} mm  {concentration(mm / 10.0):8.3f} mM")',
+    '    got, want = mass_balance()',
+    '    print(f"mass balance: {got:.6e} mol recovered of {want:.6e} placed")',
     '',
   ].join('\n');
 }
@@ -4899,14 +5231,16 @@ function renderSaltCode() {
   host.innerHTML = `
     <div>
       <h3 style="font-size:13px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-3);margin-bottom:12px">The salt gradient, in code</h3>
-      <div class="eq">C(r) = C_background + Σ_drops  1e6 · N / √(4·π·h·D·t) · exp( −r² / (4·D·t) )
+      <div class="eq">C(r,t) = C_background + Σ_drops  1e6 · N / (4·π·D·t·h) · exp( −r² / (4·D·t) )
 
   N = (stock_mM / 1000) · (volume_µL / 1e6)      moles of NaCl in the drop
   h = agar_volume_mL / (π · (plate_radius_mm)²) · 100     agar height, cm
-  D = diffusion coefficient of NaCl, cm²·s⁻¹
-  t = seconds since that drop was placed
-  r = distance from the spot, cm</div>
-      <div class="note">With the settings currently loaded: h = <b>${fmt(h, 5)} cm</b>, D = <b>${sc.D}</b> cm²·s⁻¹, background <b>${fmt(sc.bg, 3)} mM</b>, stock <b>${fmt(sc.stock, 4)} mM</b>, ${sc.drops.length} drop${sc.drops.length === 1 ? '' : 's'}${sc.drops.length ? ' (' + sc.drops.map(d => `${fmt(d.vol, 3)} µL at ${fmt(d.hours, 3)} h`).join(', ') + ')' : ''}. Peak at the spot: <b>${fmt(saltPeakC(sc, 0), 4)} mM</b>.</div>
+  D = D₂₅ · (T/298.15) · (η₂₅/η(T))              diffusion coefficient at the assay, cm²·s⁻¹
+  t = seconds since that drop was placed  (+ a²/4D for a drop of radius a)
+  r = distance from the spot, cm
+
+  ∫ C·h dA = N          mass balance, checked numerically below</div>
+      <div class="note">With the settings currently loaded: h = <b>${fmt(h, 5)} cm</b>, D = <b>${saltD(sc).toExponential(4)}</b> cm²·s⁻¹ at <b>${fmt(sc.temp, 3)} °C</b>, background <b>${fmt(sc.bg, 3)} mM</b>, stock <b>${fmt(sc.stock, 4)} mM</b>, ${sc.drops.length} drop${sc.drops.length === 1 ? '' : 's'}${sc.drops.length ? ' (' + sc.drops.map(d => `${fmt(d.vol, 3)} µL at ${fmt(d.hours, 3)} h`).join(', ') + ')' : ''}. Peak at the spot: <b>${fmt(saltPeakC(sc, 0), 4)} mM</b>.</div>
       <table><thead><tr><th class="n">Distance from the spot (mm)</th><th class="n">C (mM)</th></tr></thead><tbody>
         ${vals.map(v => `<tr><td class="n">${fmt(v[0], 4)}</td><td class="n">${fmt(v[1], 5)}</td></tr>`).join('')}
       </tbody></table>
@@ -4916,6 +5250,11 @@ function renderSaltCode() {
         <button class="btn" id="saltNbBtn">Download the notebook Python</button>
         <button class="btn" id="saltCopyBtn">Copy the JavaScript</button>
       </div>
+      <div class="note">Mass balance: integrating C·h over the plate returns
+        <b>${saltMassCheck(sc, 0).recovered.toExponential(4)} mol</b> against the
+        <b>${saltMassCheck(sc, 0).expected.toExponential(4)} mol</b> placed on it
+        (${fmt(100 * saltMassCheck(sc, 0).ratio, 4)}%). That is the test of the normalisation:
+        a formula that does not return the salt you put on cannot be a concentration.</div>
       <div class="note">The Python file has your current parameters written into it and reproduces the numbers above exactly — useful as a check, and as the thing to cite or deposit when you publish.</div>
       <details style="margin-top:10px"><summary style="cursor:pointer;font-size:13px;font-weight:600;color:var(--ink-2)">Read the code here instead</summary>
         <h4 style="font-size:12.5px;margin:14px 0 4px">The JavaScript this app just ran</h4>
@@ -5180,7 +5519,9 @@ $('zipAll').onclick = async () => {
       `  gradient geometry     ${c.navMode}`,
       `  salt model            ${sc.model === 'drops' ? 'diffusing drops (point bolus)' : sc.model === 'gauss' ? 'single Gaussian' : sc.model === 'exp' ? 'exponential decay' : 'linear ramp'}`,
       sc.model === 'drops' ? `  salt drops            ${sc.drops.map(d => `${d.vol} uL at ${d.hours} h`).join(', ') || 'none'}; stock ${sc.stock} mM, background ${sc.bg} mM` : null,
-      sc.model === 'drops' ? `  agar height           ${fmt(agarHeight(sc), 4)} cm (${sc.agarVol} mL in a ${sc.plateDia} mm plate), D = ${sc.D} cm^2/s` : null,
+      sc.model === 'drops' ? `  agar height           ${fmt(agarHeight(sc), 4)} cm (${sc.agarVol} mL in a ${sc.plateDia} mm plate)` : null,
+      sc.model === 'drops' ? `  temperature           ${sc.temp} C, D = ${saltD(sc).toExponential(4)} cm^2/s${sc.dMode === 'manual' ? ' (entered by hand)' : ' (from D25 = ' + sc.D25 + ')'}` : null,
+      sc.model === 'drops' && sc.dropR > 0 ? `  drop radius           ${sc.dropR} mm` : null,
       `  salt peak at spot     ${fmt(saltPeakC(sc, 0), 4)} mM`,
       `  salt dC window        ${sc.win} s, ${sc.bins} bins, ${sc.binMode === 'count' ? 'equal count' : 'equal width'}`,
       A ? `  roaming threshold     ${fmt(A.roamThr, 3)}${isFinite(c.roamThr) ? ' (manual)' : ' (automatic)'}` : null,
@@ -5394,10 +5735,17 @@ function renderMethods() {
 <p>The exponent α is fitted over the first half of the lag range, where there are the most independent samples; lags beyond ${fmt(c.msdMaxFrac * 100)}% of a track are not computed at all because they average over too few starting points to be stable. The effective diffusion coefficient is MSD ÷ 4τ at the reference lag, in two dimensions. Because overlapping time windows are used, neighbouring points on an MSD curve are correlated — read the shape, and do the statistics on the per-animal α and D rather than on the curve.</p>
 
 <h3>The salt gradient, and responses to it</h3>
-<p>A chemotaxis plate carries no sensor, so the stimulus has to be modelled. A drop of volume <i>v</i> of a <i>c</i>&#8203;<sub>0</sub> stock placed on the agar <i>t</i> seconds ago is treated as a point bolus diffusing in a thin layer, which gives, at a distance <i>r</i> from the spot, C(r) = 10<sup>6</sup>·N / &#8730;(4&#960;hD t) · exp(&#8722;r&#178;/4D t), with N = (c<sub>0</sub>/1000)·(v/10<sup>6</sup>) moles, <i>h</i> the agar height in cm computed from the volume poured and the area of the plate, and D = 1.516&#215;10<sup>&#8722;5</sup> cm&#178;&#183;s<sup>&#8722;1</sup> for NaCl (Robinson &amp; Stokes 1951). Several drops add linearly on top of the salt already in the agar. Nothing in this expression is fitted to the behavioural data, and the full source — including a standalone Python copy with your own numbers in it — is in the box below, so it can be checked independently.</p>
-<p>Three caveats are worth stating in a methods section. The model assumes a laterally infinite, uniformly thick layer, so it is wrong within a few millimetres of the rim and wrong if the plate was poured unevenly. It assumes the drop was absorbed instantly at a point, which is a good approximation once the drop is hours old and a poor one in the first minutes. And it uses the normalisation of the source notebook, &#8730;(4&#960;hD t); any constant error in that normalisation scales every concentration by the same factor, which shifts the axis of the response plots but leaves the sign and the significance of every slope untouched.</p>
+<p>A chemotaxis plate carries no sensor, so the stimulus has to be modelled. A drop of volume <i>v</i> of a <i>c</i>&#8203;<sub>0</sub> stock placed on the agar <i>t</i> seconds ago is treated as a point bolus diffusing laterally in a thin layer of thickness <i>h</i>, giving, at a distance <i>r</i> from the spot, C(r,t) = 10<sup>6</sup>·N / (4&#960;D t h) · exp(&#8722;r&#178;/4D t) in mM, with N = (c<sub>0</sub>/1000)·(v/10<sup>6</sup>) moles and <i>h</i> in cm computed from the volume poured and the area of the plate. Several drops add linearly on top of the salt already in the agar. The normalisation is verified numerically rather than asserted: integrating C·h over the plate returns the moles that were pipetted onto it, which is reported with the model on this page. Nothing in the expression is fitted to the behavioural data, and the full source — including a standalone Python copy with your own numbers in it — is in the box below, so it can be checked independently.</p>
+<p>The diffusion coefficient is a measured quantity with a temperature attached to it. The tabulated NaCl value, 1.516&#215;10<sup>&#8722;5</sup> cm&#178;&#183;s<sup>&#8722;1</sup> (Robinson &amp; Stokes 1951), is for water at 25 °C; a plate run at 20 °C diffuses roughly 13% more slowly. The app therefore takes the assay temperature and rescales D by T/&#951;(T) (Stokes&#8211;Einstein, with the water viscosity correlation of Kestin et al. 1978), or takes a value entered by hand. State the temperature and the D you used; the exported archive records both.</p>
+<p>Four caveats belong in a methods section.</p>
+<ul>
+<li><b>The rim.</b> The model assumes a laterally infinite layer of uniform thickness. The spread length &#8730;(4Dt) is about 0.5 cm an hour after spotting but about 2 cm after 18 h, so for overnight gradients the no-flux boundary matters across much of a 5&#8211;9 cm plate, not merely within a few millimetres of the edge. Salt that would have diffused past the wall is instead reflected back, so the true field near the rim is higher than this model says. Handling it properly needs image sources or a finite-difference solve on the disc; neither is done here.</li>
+<li><b>Early times.</b> The thin-layer treatment needs &#8730;(Dt) to be large compared with <i>h</i>. With <i>h</i> &#8776; 0.3&#8211;0.4 cm that holds only after tens of minutes, so in the first minutes after a drop the salt has not yet spread through the depth of the agar and the surface concentration is higher than modelled. A drop of finite radius <i>a</i> is handled, optionally, by starting its clock at <i>a</i>&#178;/4D instead of zero.</li>
+<li><b>D itself.</b> Published values are for water, at a stated temperature, and depend on concentration; agar adds some tortuosity on top. The temperature correction above is a first-order one, not a measurement. If a conclusion depends on the absolute concentrations rather than on their spatial pattern, vary D by ±10% and check that it survives.</li>
+<li><b>The percentage axis.</b> Dividing by the local concentration is meaningful only while that concentration is well above zero. Samples below 0.05 mM are dropped from that measure, and with little or no salt in the agar most of the far field is excluded, which is itself worth reporting. &#916;C and dC/dt do not have this problem: they are differences, so the background cancels.</li>
+</ul>
 <p>Each animal is then put through its own modelled field. At every sample the distance to the spot gives a concentration C; from that follow the change since the previous sample, the change across an adjustable look-back window (&#916;C), the instantaneous rate of change dC/dt, and the change expressed as a percentage of the previous concentration. Reorientation rate against each of these is computed the same way the bearing analysis is computed: the recording is divided into bins of the salt variable, the time each animal spent in each bin and the number of reorientations that began there are counted separately per animal, and the rate is a count divided by a time rather than an average of ratios. Bin edges are built from every condition pooled, so panels are directly comparable, and are either equal in width across a trimmed central range or equal in count, switchable. A straight line fitted across the bins gives one slope per replicate; those slopes are compared between conditions and tested against zero.</p>
-<p>A negative slope against &#916;C or dC/dt is the signature of klinokinesis: fewer reorientations while the salt is rising, more while it is falling, which biases an otherwise random walk up the gradient. The percentage-change plot is the Weber-scaled version of the same measure, and is the better one if the animals respond to relative rather than absolute change. Conditions marked <b>No gradient</b> are run through identical code against the position the spot would have occupied; their slopes should sit at zero, and a result in which the gradient condition differs from zero while the control does not is a far stronger claim than the two conditions merely differing from each other.</p>
+<p>A slope against &#916;C or dC/dt is a statement about <b>klinokinesis</b> only — the pirouette strategy. It says nothing about weathervaning, which is measured separately on the Navigation tab, so neither measure on its own is a full account of chemotaxis. The sign that counts as &ldquo;correct&rdquo; depends on the condition: for an animal attracted to salt, fewer reorientations while the salt is rising biases the walk up the gradient, but after salt&#8211;starvation conditioning the same animals avoid that concentration and the expected slope flips. Frame the prediction by condition rather than treating one sign as the signature of chemotaxis. The percentage-change plot is the Weber-scaled version of the same measure, and is the better one if the animals respond to relative rather than absolute change. Conditions marked <b>No gradient</b> are run through identical code against the position the spot would have occupied; their slopes should sit at zero, and a result in which the gradient condition differs from zero while the control does not is a far stronger claim than the two conditions merely differing from each other.</p>
 <p>The gradient map draws the same field under the tracks as filled iso-concentration bands with labelled contour rings. The shading is spaced evenly in log concentration by default, because a diffusion field falls off fast enough that a linear scale puts almost the whole plate in one band; a linear scale is available for comparison with the simulation notebook. The bands are real polygons, not an image, so the exported SVG and PDF stay fully editable.</p>
 
 <h3>Statistics</h3>
@@ -5428,6 +5776,7 @@ function renderMethods() {
 <li>Iino Y, Yoshida K (2009). Parallel use of two behavioral mechanisms for chemotaxis in <i>C. elegans</i>. <i>J Neurosci</i> 29:5370–5380.</li>
 <li>Ramot D, Johnson BE, Berry TL, Carnell L, Goodman MB (2008). The Parallel Worm Tracker. <i>PLoS ONE</i> 3:e2208.</li>
 <li>Kramer TS, Wan FK, Pugliese SM, Atanas AA, Pradhan S, Hiser AW, Godinez LM, Luo J, Bueno E, Felt T, Flavell SW (2026). Neural sequences underlying directed turning in <i>C. elegans</i>. <i>Nat Neurosci</i>.</li>
+<li>Kestin J, Sokolov M, Wakeham WA (1978). Viscosity of liquid water in the range &#8722;8 °C to 150 °C. <i>J Phys Chem Ref Data</i> 7:941&#8211;948.</li>
 <li>Robinson RA, Stokes RH (1951). Tables of viscosity and diffusion coefficients of aqueous sodium chloride solutions. <i>J Am Chem Soc</i> 73:4332.</li>
 <li>Kunitomo H, Sato H, Iwata R, Satoh Y, Ohno H, Yamada K, Iino Y (2013). Concentration memory-dependent synaptic plasticity of a taste circuit regulates salt concentration chemotaxis in <i>C. elegans</i>. <i>Nat Commun</i> 4:2210.</li>
 <li>Ben Arous J, Laffont S, Chatenay D (2009). Molecular and sensory basis of a food-related two-state behavior in <i>C. elegans</i>. <i>PLoS ONE</i> 4:e7584.</li>
@@ -5472,6 +5821,7 @@ function renderGuide() {
 <p><b>Runs</b> — how long and how far the animal travelled between turns.</p>
 <p><b>Navigation</b> — only useful if there is a gradient. It asks whether the animal is <i>steering</i>, in the two ways worms actually do it: turning less often when already pointed the right way, and gently curving toward the target while crawling.</p>
 <p><b>A note on controls.</b> If some of your plates had no odour on them, say so — mark that condition <i>No gradient</i> on the Navigation tab. The tool then measures it in exactly the same way, pretending the odour was where it would have been. That is the whole point: the control tells you what "no steering" looks like on your own rig, including any lopsidedness in the plate, the camera or the tracker. A steering result you believe looks like this: the gradient condition is clearly different from zero, and the no-gradient condition is not.</p>
+<p><b>Heading rose</b> — which way the animals pointed, drawn on a circle. The arrow in the middle is the average direction, and how long it is tells you how committed they were to it: a stubby arrow means they wandered every which way.</p>
 <p><b>Roaming &amp; dwelling</b> — worms on food flip between exploring (fast and straight) and staying put (slow and wiggly). This tab measures how much time each group spends in each mode.</p>
 <p><b>Time course</b> — everything above, but split into time bins, so you can see whether a difference was there from the start or built up over the assay.</p>
 <p><b>Salt gradient</b> — where you describe the plate: how big it was, how much agar, and the drops of salt you put on it and when. From that the tool works out the concentration everywhere on the plate. You only do this once.</p>

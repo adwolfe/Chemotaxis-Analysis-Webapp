@@ -5,7 +5,7 @@ file in a browser, drop in your tracking output, and get reorientation rates, sp
 gradient navigation, roaming/dwelling, MSD and salt-response plots — with the statistics, the figures
 and the raw numbers ready to export.
 
-**[Open the app →](https://anjaliav.github.io/Chemotaxis-Analysis-Webapp/)**
+**[Open the app →](https://anjaliav.github.io/Chemotaxis_Tracks_Analysis_Webapp_v1/)**
 
 Nothing is uploaded anywhere. The whole program is one `index.html` with no libraries and no build
 step; it runs entirely in the browser, works offline, and your data never leaves your computer.
@@ -17,8 +17,10 @@ step; it runs entirely in the browser, works offline, and your data never leaves
 1. Open the link above, or download `index.html` and double-click it.
 2. On the **Tracks** tab, drag your CSV or `.xlsx` files onto the drop zone — one file per plate.
 3. On **Data & groups**, add a second condition and drop its files in.
-4. On **Analysis settings**, set the **frame rate** (fps) and the **scale** (pixels per mm). Without
-   them the app still works, but time is counted in frames and distance in pixels.
+4. On **Data & groups**, set the **frame rate** (fps) and the **scale** (pixels per mm). Without
+   them the app still works, but time is counted in frames and distance in pixels. A calibrated
+   recording can still be plotted in pixels — *Distance axes* switches the axes without touching the
+   salt model, which always works in millimetres.
 5. Go back to **Tracks** and move the threshold sliders until the marks land on the turns you can
    actually see. That calibration step is the analysis; everything downstream follows from it.
 
@@ -62,6 +64,8 @@ you the percentage of rows carrying each code and lets you choose which to keep 
 - Roaming and dwelling from log₁₀(speed ÷ angular speed), threshold by Otsu or by hand
 - Mean squared displacement with the log–log exponent α and an effective diffusion coefficient
 - Time course of any of the above in equal time bins
+- Heading distributions on a rose plot, in plate coordinates or relative to the cue, with the
+  resultant vector R, the circular mean and a Rayleigh test
 - A modelled salt gradient, and reorientation rate against concentration, ΔC, dC/dt and % change
 - Tracks and reorientation locations drawn over the modelled gradient field
 
@@ -83,22 +87,42 @@ and the control does not", which is stronger than the two merely differing.
 The field is modelled as a point bolus diffusing in a thin agar layer:
 
 ```
-C(r) = C_background + Σ_drops  1e6 · N / √(4·π·h·D·t) · exp( −r² / (4·D·t) )
+C(r,t) = C_background + Σ_drops  1e6 · N / (4·π·D·t·h) · exp( −r² / (4·D·t) )      mM
 
-N = (stock_mM / 1000) · (volume_µL / 1e6)              moles of NaCl in the drop
-h = agar_volume_mL / (π · plate_radius_mm²) · 100      agar height, cm
-D = 1.516e-5 cm²·s⁻¹                                   NaCl, Robinson & Stokes (1951)
-t = seconds since that drop was placed
+N   = (stock_mM / 1000) · (volume_µL / 1e6)            moles of NaCl in the drop
+h   = agar_volume_mL / (π · plate_radius_mm²) · 100    agar height, cm
+D25 = 1.516e-5 cm²·s⁻¹                                 NaCl in water at 25 °C,
+                                                       Robinson & Stokes (1951)
+D   = D25 · (T/298.15) · (η(25°C)/η(T))                Stokes–Einstein, with the water
+                                                       viscosity of Kestin et al. (1978)
+t   = seconds since that drop was placed
+      (+ a²/4D if a non-zero drop radius a is given)
 ```
+
+`1e6·N/(4πDth)` is the thin-layer solution of the diffusion equation: integrating `C·h` over the
+plate returns exactly the moles that were pipetted onto it, and the app reports that mass balance
+next to the model rather than asserting it. Set the **assay temperature** — a plate run at 20 °C
+diffuses about 13% more slowly than the 25 °C table value, so D = 1.324e-5 cm²·s⁻¹ there — or enter
+a D of your own.
+
+Four caveats belong in a methods section: the model has no plate wall, so for overnight gradients
+(√(4Dt) ≈ 2 cm at 18 h) the true field near the rim is higher than modelled; the thin-layer limit
+needs √(Dt) ≫ h, so the first minutes after a drop are underestimated; published D values are for
+water at a stated temperature and agar adds tortuosity, so vary D by ±10% if a conclusion rests on
+absolute concentrations; and the percentage-change axis divides by the local concentration, so
+samples below 0.05 mM are dropped from it.
 
 Nothing in it is fitted to behaviour. Single-Gaussian, exponential and linear-ramp alternatives are
 selectable so a result can be shown not to depend on the shape of the model. The **Methods** tab
 prints the formula, the live JavaScript, and a standalone Python file with your own parameters baked
 in — download it and check the numbers independently.
 
-Two things worth knowing before quoting salt results: ΔC and dC/dt are *differences*, so the assumed
-background concentration cancels exactly, while the percentage-change axis divides by concentration
-and inherits it. And concentration is one-to-one with distance from the drop, so a rate-versus-C plot
+Two more things worth knowing before quoting salt results: ΔC and dC/dt are *differences*, so the
+assumed background concentration cancels exactly, while the percentage-change axis divides by
+concentration and inherits it. A slope against ΔC or dC/dt is a statement about klinokinesis only —
+weathervaning is measured separately on the Navigation tab — and which sign counts as "correct"
+depends on the conditioning, since salt-starved animals avoid the concentration they were
+conditioned at. And concentration is one-to-one with distance from the drop, so a rate-versus-C plot
 is also a map of where the animal was — which is what the no-gradient control is for.
 
 ---
@@ -168,8 +192,9 @@ Methods implemented here follow, among others:
 - Collisions and track swaps produce spurious hairpins; the jump filter catches the worst, but tracks
   with many crossings deserve a look.
 - The salt model assumes a laterally infinite, uniformly thick agar layer and an instantaneous point
-  bolus — it is wrong within a few millimetres of the rim and in the first minutes after a drop.
+  bolus, with no plate wall: it underestimates the field near the rim, and the more so the older the
+  gradient. The first minutes after a drop are underestimated too, unless a drop radius is given.
 
 ## Licence
 
-Not yet chosen.
+Not yet chosen — add one before sharing widely (MIT is the usual choice for a tool like this).
