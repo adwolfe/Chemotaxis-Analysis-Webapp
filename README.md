@@ -101,6 +101,10 @@ selectable so a result can be shown not to depend on the shape of the model. The
 prints the formula, the live JavaScript, and a standalone Python file with your own parameters baked
 in — download it and check the numbers independently.
 
+For a circular track figure, select **Gradient map → Map extent → Full plate** and enter the plate
+centre in the tracking coordinate system, in pixels. The diameter comes from **Salt gradient**.
+**Track region** zooms in on the recorded paths and the source.
+
 Two things worth knowing before quoting salt results: ΔC and dC/dt are *differences*, so the assumed
 background concentration cancels exactly, while the percentage-change axis divides by concentration
 and inherits it. And concentration is one-to-one with distance from the drop, so a rate-versus-C plot

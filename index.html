@@ -730,6 +730,11 @@ td.n,th.n{text-align:right;font-variant-numeric:tabular-nums;font-family:var(--m
             <option value="overlay">All conditions on one panel</option>
             <option value="worm">One panel per worm</option>
           </select></div>
+        <div style="min-width:155px"><label class="f" for="gmExtent">Map extent</label>
+          <select id="gmExtent">
+            <option value="plate">Full plate</option>
+            <option value="tracks">Track region</option>
+          </select></div>
         <div style="min-width:170px"><label class="f">Colour ramp</label>
           <select id="gmRamp">
             <option value="grey">Greys</option>
@@ -761,9 +766,10 @@ td.n,th.n{text-align:right;font-variant-numeric:tabular-nums;font-family:var(--m
         <label class="chk"><input type="checkbox" id="gmMarks"> Mark the reorientations</label>
         <label class="chk"><input type="checkbox" id="gmReo" checked> Reorientations-only panel</label>
         <label class="chk"><input type="checkbox" id="gmRing"> Plate outline and worm ring</label>
-        <div style="width:132px;flex:0 0 132px"><label class="f">Plate centre x <span class="hint">px</span></label><input type="number" id="saltCx" step="any" placeholder="optional"></div>
-        <div style="width:132px;flex:0 0 132px"><label class="f">Plate centre y <span class="hint">px</span></label><input type="number" id="saltCy" step="any" placeholder="optional"></div>
+        <div style="width:132px;flex:0 0 132px"><label class="f" for="saltCx">Plate centre x <span class="hint">px</span></label><input type="number" id="saltCx" step="any"></div>
+        <div style="width:132px;flex:0 0 132px"><label class="f" for="saltCy">Plate centre y <span class="hint">px</span></label><input type="number" id="saltCy" step="any"></div>
       </div>
+      <div class="note">Full plate uses the diameter set in Salt gradient and the plate centre in the same pixel coordinates as the tracks.</div>
     </div>
     <div id="gmFigs"><div class="empty">Load data first.</div></div>
     <div class="card"><h3>Salt experienced, per replicate</h3><div class="scroll" id="gmTable"></div></div>
@@ -1171,12 +1177,15 @@ function pdfText(s) { // WinAnsi-safe
     .replace(/[·•]/g, '\\267').replace(/[²]/g, '\\262').replace(/[×]/g, '\\327')
     .replace(/[^\x20-\x7e\\]/g, ''); }
 
+let nextFigClipId = 0;
 class Fig {
   constructor(w, h, title) { this.w = w; this.h = h; this.title = title || 'figure'; this.items = []; this.bg = '#ffffff'; this.fg = '#111111'; }
   line(x1, y1, x2, y2, o = {}) { this.items.push({ k: 'line', x1, y1, x2, y2, o }); return this; }
   poly(pts, o = {}) { if (pts.length > 1) this.items.push({ k: 'poly', pts, o }); return this; }
   rect(x, y, w, h, o = {}) { this.items.push({ k: 'rect', x, y, w, h, o }); return this; }
   circle(cx, cy, r, o = {}) { this.items.push({ k: 'circle', cx, cy, r, o }); return this; }
+  clipCircle(cx, cy, r) { this.items.push({ k: 'clipCircle', cx, cy, r, id: `fig-clip-${++nextFigClipId}` }); }
+  endClip() { this.items.push({ k: 'endClip' }); }
   text(x, y, s, o = {}) { if (s !== '' && s != null) this.items.push({ k: 'text', x, y, s: String(s), o }); return this; }
   clone() { const f = new Fig(this.w, this.h, this.title); f.items = this.items; f.bg = this.bg; f.fg = this.fg; return f; }
 
@@ -1198,6 +1207,8 @@ class Fig {
       else if (it.k === 'poly') P.push(`<polyline points="${it.pts.map(p => `${+p[0].toFixed(2)},${+p[1].toFixed(2)}`).join(' ')}" ${st(o)}/>`);
       else if (it.k === 'rect') P.push(`<rect x="${+it.x.toFixed(2)}" y="${+it.y.toFixed(2)}" width="${+it.w.toFixed(2)}" height="${+it.h.toFixed(2)}" ${st(o)}/>`);
       else if (it.k === 'circle') P.push(`<circle cx="${+it.cx.toFixed(2)}" cy="${+it.cy.toFixed(2)}" r="${+it.r.toFixed(2)}" ${st(o)}/>`);
+      else if (it.k === 'clipCircle') P.push(`<defs><clipPath id="${it.id}"><circle cx="${it.cx}" cy="${it.cy}" r="${it.r}"/></clipPath></defs><g clip-path="url(#${it.id})">`);
+      else if (it.k === 'endClip') P.push('</g>');
       else if (it.k === 'text') { const anc = o.anchor === 'middle' ? 'middle' : o.anchor === 'end' ? 'end' : 'start';
         const rot = o.rot ? ` transform="rotate(${o.rot} ${+it.x.toFixed(2)} ${+it.y.toFixed(2)})"` : '';
         P.push(`<text x="${+it.x.toFixed(2)}" y="${+it.y.toFixed(2)}" font-size="${o.size || 11}" text-anchor="${anc}" fill="${col(o.fill || this.fg)}"${o.weight === 'bold' ? ' font-weight="bold"' : ''}${o.op != null ? ` opacity="${o.op}"` : ''}${rot}>${escXml(it.s)}</text>`); } }
@@ -1210,13 +1221,33 @@ class Fig {
       if (!/^[0-9a-fA-F]{6}$/.test(c)) return '0 0 0';
       return [parseInt(c.slice(0, 2), 16) / 255, parseInt(c.slice(2, 4), 16) / 255, parseInt(c.slice(4, 6), 16) / 255].map(v => v.toFixed(3)).join(' '); };
     const Y = y => (H - y).toFixed(2), X = x => x.toFixed(2);
+    const circlePath = ({ cx, cy, r }) => {
+      const k = .5523 * r;
+      return `${X(cx + r)} ${Y(cy)} m ` +
+        `${X(cx + r)} ${Y(cy - k)} ${X(cx + k)} ${Y(cy - r)} ${X(cx)} ${Y(cy - r)} c ` +
+        `${X(cx - k)} ${Y(cy - r)} ${X(cx - r)} ${Y(cy - k)} ${X(cx - r)} ${Y(cy)} c ` +
+        `${X(cx - r)} ${Y(cy + k)} ${X(cx - k)} ${Y(cy + r)} ${X(cx)} ${Y(cy + r)} c ` +
+        `${X(cx + k)} ${Y(cy + r)} ${X(cx + r)} ${Y(cy + k)} ${X(cx + r)} ${Y(cy)} c`;
+    };
     let c = [];
     const bgc = hex(this.bg); c.push(`${bgc} rg 0 0 ${this.w.toFixed(2)} ${H.toFixed(2)} re f`);
     let curOp = 1;
     const setOp = o => { const v = o == null ? 1 : o; if (v !== curOp) { c.push(`/GS${Math.round(v * 100)} gs`); curOp = v; } };
     const ops = new Set([100]);
-    for (const it of this.items) { const o = it.o; const v = o.op == null ? 1 : o.op; ops.add(Math.round(v * 100)); }
-    for (const it of this.items) { const o = { ...it.o }; setOp(o.op);
+    const savedOps = [];
+    for (const it of this.items) {
+      if (it.k === 'clipCircle') {
+        savedOps.push(curOp);
+        c.push(`q ${circlePath(it)} W n`);
+        continue;
+      }
+      if (it.k === 'endClip') {
+        c.push('Q');
+        curOp = savedOps.pop();
+        continue;
+      }
+      const o = { ...it.o };
+      ops.add(Math.round((o.op ?? 1) * 100)); setOp(o.op);
       if (!o.fill || o.fill === 'none') delete o.fill;
       if (!o.stroke || o.stroke === 'none') delete o.stroke;
       const strokeSet = () => c.push(`${hex(o.stroke)} RG ${(o.sw == null ? 1 : o.sw).toFixed(2)} w 1 J 1 j` + (o.dash ? ` [${String(o.dash).replace(/,/g, ' ')}] 0 d` : ' [] 0 d'));
@@ -1226,14 +1257,9 @@ class Fig {
         c.push(it.pts.map((p, i) => `${X(p[0])} ${Y(p[1])} ${i ? 'l' : 'm'}`).join(' ') + ' ' + (o.fill && o.stroke ? 'B' : o.fill ? 'f' : 'S')); }
       else if (it.k === 'rect') { if (o.stroke) strokeSet(); if (o.fill) fillSet();
         c.push(`${X(it.x)} ${Y(it.y + it.h)} ${it.w.toFixed(2)} ${it.h.toFixed(2)} re ` + (o.fill && o.stroke ? 'B' : o.fill ? 'f' : 'S')); }
-      else if (it.k === 'circle') { const k = .5523 * it.r, cx = it.cx, cy = it.cy;
+      else if (it.k === 'circle') {
         if (o.stroke) strokeSet(); if (o.fill) fillSet();
-        c.push(`${X(cx + it.r)} ${Y(cy)} m ` +
-          `${X(cx + it.r)} ${Y(cy - k)} ${X(cx + k)} ${Y(cy - it.r)} ${X(cx)} ${Y(cy - it.r)} c ` +
-          `${X(cx - k)} ${Y(cy - it.r)} ${X(cx - it.r)} ${Y(cy - k)} ${X(cx - it.r)} ${Y(cy)} c ` +
-          `${X(cx - it.r)} ${Y(cy + k)} ${X(cx - k)} ${Y(cy + it.r)} ${X(cx)} ${Y(cy + it.r)} c ` +
-          `${X(cx + k)} ${Y(cy + it.r)} ${X(cx + it.r)} ${Y(cy + k)} ${X(cx + it.r)} ${Y(cy)} c ` +
-          (o.fill && o.stroke ? 'B' : o.fill ? 'f' : 'S')); }
+        c.push(circlePath(it) + ' ' + (o.fill && o.stroke ? 'B' : o.fill ? 'f' : 'S')); }
       else if (it.k === 'text') { const size = o.size || 11, bold = o.weight === 'bold';
         const w = txtWidth(pdfText(it.s).replace(/\\(\d{3}|.)/g, 'o'), size, bold);
         let dx = 0; if (o.anchor === 'middle') dx = -w / 2; else if (o.anchor === 'end') dx = -w;
@@ -2659,10 +2685,15 @@ function strokeArcInBox(fig, cx, cy, r, B, style) {
 }
 function fieldTrackFig(title, tracks, dom, opt) {
   const sc = opt.sc, tAdd = opt.tAdd || 0, src = opt.source;
+  const plate = opt.plate;
+  const full = opt.fullPlate && plate;
   const cbarOn = opt.cbar !== false;
   const legN = (opt.legend && opt.legend.length) ? opt.legend.length : 0;
-  const pad = { l: 56, r: cbarOn ? 88 : 16, t: 26, b: legN ? 70 : 46 };
-  const [xd, yd] = dom;
+  const pad = { l: full ? 12 : 56, r: cbarOn ? 88 : 16, t: 26,
+    b: full ? 12 + (legN ? 24 : 0) + (opt.scaleBar ? 24 : 0) : (legN ? 70 : 46) };
+  const radius = full ? plate.dia / 2 : 0;
+  const [xd, yd] = full
+    ? [[plate.cx - radius, plate.cx + radius], [plate.cy - radius, plate.cy + radius]] : dom;
   const size = opt.size || 460;
   let W = size, H = size;
   const aw = size - pad.l - pad.r, ah = size - pad.t - pad.b;
@@ -2675,13 +2706,16 @@ function fieldTrackFig(title, tracks, dom, opt) {
   const sx = v => B.x0 + (v - xd[0]) / (xd[1] - xd[0]) * bw;
   const sy = v => opt.flipY ? B.y0 + (v - yd[0]) / (yd[1] - yd[0]) * bh : B.y1 - (v - yd[0]) / (yd[1] - yd[0]) * bh;
   fig.text(pad.l, 15, title, { size: 12, weight: 'bold', fill: INK.text });
+  if (full) fig.clipCircle(sx(plate.cx), sy(plate.cy), bw / 2);
 
   /* --- the field, as filled bands between iso-concentration circles --- */
   const corners = [[xd[0], yd[0]], [xd[1], yd[0]], [xd[0], yd[1]], [xd[1], yd[1]]];
   let cHi = 0, cLo = 0, rFar = 1, T = null;
   if (src) {
-    rFar = maxOf(corners.map(p => Math.hypot(p[0] - src.x, p[1] - src.y))) || 1;
-    const rNear = Math.hypot(clamp(src.x, xd[0], xd[1]) - src.x, clamp(src.y, yd[0], yd[1]) - src.y);
+    const sourceOffset = full ? Math.hypot(plate.cx - src.x, plate.cy - src.y) : 0;
+    rFar = full ? sourceOffset + radius : (maxOf(corners.map(p => Math.hypot(p[0] - src.x, p[1] - src.y))) || 1);
+    const rNear = full ? Math.max(0, sourceOffset - radius)
+      : Math.hypot(clamp(src.x, xd[0], xd[1]) - src.x, clamp(src.y, yd[0], yd[1]) - src.y);
     cHi = saltAt(rNear / 10, sc, tAdd); cLo = saltAt(rFar / 10, sc, tAdd);
     if (cHi > cLo) T = saltScaleFns(opt.scale || 'log', cLo, cHi);
   }
@@ -2701,7 +2735,7 @@ function fieldTrackFig(title, tracks, dom, opt) {
     }
   }
 
-  const A = frame(fig, B, xd, yd, { grid: opt.grid === true, flipY: opt.flipY,
+  if (!full) frame(fig, B, xd, yd, { grid: opt.grid === true, flipY: opt.flipY,
     xlab: `x (${opt.sUnit})`, ylab: `y (${opt.sUnit})`, ylabX: 14 });
 
   /* --- contour rings, labelled in mM --- */
@@ -2717,6 +2751,7 @@ function fieldTrackFig(title, tracks, dom, opt) {
         const t = fmt(v, 3), tw = txtWidth(t, 8.5);
         for (const q of cand) { const X = sx(q[0]), Y = sy(q[1]) - 3;
           if (!(X > B.x0 + 18 && X < B.x1 - 18 && Y > B.y0 + 13 && Y < B.y1 - 5)) continue;
+          if (full && Math.hypot(X - sx(plate.cx), Y - sy(plate.cy)) + tw / 2 + 8 > bw / 2) continue;
           const box = { a: X - tw / 2 - 2, b: X + tw / 2 + 2, y: Y };
           if (placedLab.some(p => Math.abs(p.y - box.y) < 9 && box.a < p.b && p.a < box.b)) continue;
           placedLab.push(box);
@@ -2726,11 +2761,11 @@ function fieldTrackFig(title, tracks, dom, opt) {
   }
 
   /* --- plate outline and the ring the animals were placed on --- */
-  if (opt.plate && isFinite(opt.plate.cx) && isFinite(opt.plate.cy)) {
-    const P = opt.plate, pr = Math.abs(sx(P.cx + P.dia / 2) - sx(P.cx));
-    strokeArcInBox(fig, sx(P.cx), sy(P.cy), pr, B, { stroke: INK.axis, sw: 1.1, op: .85 });
-    if (P.ring > 0) { const rr = Math.abs(sx(P.cx + P.ring) - sx(P.cx));
-      strokeArcInBox(fig, sx(P.cx), sy(P.cy), rr, B, { stroke: '#d1495b', sw: 1, dash: '5,4', op: .85 }); }
+  if (plate) {
+    const { cx, cy, dia, ring } = plate;
+    const pixels = length => Math.abs(sx(cx + length) - sx(cx));
+    if (!full) strokeArcInBox(fig, sx(cx), sy(cy), pixels(dia / 2), B, { stroke: INK.axis, sw: 1.1, op: .85 });
+    if (ring > 0) strokeArcInBox(fig, sx(cx), sy(cy), pixels(ring), B, { stroke: '#d1495b', sw: 1, dash: '5,4', op: .85 });
   }
 
   /* --- tracks, each with a white casing so they read over the shading --- */
@@ -2755,6 +2790,10 @@ function fieldTrackFig(title, tracks, dom, opt) {
       fig.circle(X, Y, 4.8, { fill: '#ffffff', op: .92 });
       fig.circle(X, Y, 4.8, { stroke: '#d1495b', sw: 1.5 });
       fig.circle(X, Y, 1.5, { fill: '#d1495b' }); } }
+  if (full) {
+    fig.endClip();
+    fig.circle(sx(plate.cx), sy(plate.cy), bw / 2, { stroke: INK.axis, sw: 1.1, op: .85 });
+  }
 
   /* --- colour bar, spaced the same way as the bands --- */
   if (cbarOn && T && ramp !== 'none') {
@@ -2770,8 +2809,9 @@ function fieldTrackFig(title, tracks, dom, opt) {
       fig.text(bx + bwd + 5, yy + 3.2, fmt(v, 3), { size: 9, fill: INK.tick }); });
     fig.text(bx + 1, y0 - 7, 'mM', { size: 9, fill: INK.tick });
   }
-  if (opt.scaleBar) { const len = opt.scaleBar, X = B.x1 - 12, Y = B.y1 - 12;
+  if (opt.scaleBar) { const len = opt.scaleBar, Y = full ? B.y1 + 20 : B.y1 - 12;
     const px = (len / (xd[1] - xd[0])) * bw;
+    const X = full ? B.x0 + (bw + px) / 2 : B.x1 - 12;
     fig.line(X - px, Y, X, Y, { stroke: INK.text, sw: 2.2, cap: 'butt' });
     fig.text(X - px / 2, Y - 5, `${len} ${opt.sUnit}`, { size: 9.5, anchor: 'middle', fill: INK.text }); }
   if (opt.note) fig.text(B.x0 + 6, B.y0 + 13, opt.note, { size: 9, fill: INK.tick });
@@ -2790,7 +2830,7 @@ function plateFieldFig(sc, scale) {
     : sc.spot === 'edge' ? { x: d / 2, y: d * .1 } : { x: d / 2, y: d / 4 };
   return fieldTrackFig(`Modelled salt field — ${fmt(d, 3)} mm plate`, [], [[0, d], [0, d]], {
     sc, source: spot, size: 480, equal: true, flipY: true, sUnit: 'mm', scale: scale || 'log',
-    rampName: sc.rampName, contour: true, labels: true, cbar: true,
+    rampName: sc.rampName, contour: true, labels: true, cbar: true, fullPlate: true,
     plate: { cx: d / 2, cy: d / 2, dia: d, ring: sc.ring },
     note: `peak ${fmt(saltPeakC(sc, 0), 3)} mM · background ${fmt(sc.bg, 3)} mM`,
   });
@@ -3432,12 +3472,20 @@ const WATCH = ['fps','pxmm','rateUnit','smoothWin','smoothMethod','sgOrder','dt'
  'sdV1','sdT1','sdV2','sdT2','sdV3','sdT3','sdV4','sdT4',
  'saltPeak','saltSigma','saltLambda','saltRamp','saltSpot','saltRing','saltBands','saltRampSel','saltScale',
  'saltWin','saltBins','saltBinMode','saltTrim','saltPerInt','saltTrimFig',
- 'gmLayout','gmRamp','gmBands','gmScale','gmSize','gmAt','gmContour','gmLabels','gmHalo','gmCbar','gmMarks','gmReo','gmRing',
+ 'gmLayout','gmExtent','gmRamp','gmBands','gmScale','gmSize','gmAt','gmContour','gmLabels','gmHalo','gmCbar','gmMarks','gmReo','gmRing',
  'saltCx','saltCy'];
 const TOUCHED = new Set();
 WATCH.forEach(id => { const n = $(id); if (!n) return;
   n.addEventListener(n.type === 'checkbox' || n.tagName === 'SELECT' ? 'change' : 'input',
-    () => { TOUCHED.add(id); if (id.startsWith('mk') || id === 'trkStart' || id === 'trkEnd') refreshSwatches(); schedule(); }); });
+    () => {
+      TOUCHED.add(id);
+      if (id.startsWith('mk') || id === 'trkStart' || id === 'trkEnd') refreshSwatches();
+      if (['gmExtent', 'saltCx', 'saltCy', 'saltPlateDia'].includes(id)) {
+        Object.keys(ST.zoom).filter(key => /^(gradient_map_|reorientations_on_field_)/.test(key))
+          .forEach(key => delete ST.zoom[key]);
+      }
+      schedule();
+    }); });
 
 $('roamAutoBtn').onclick = () => { $('roamThr').value = ''; schedule(); };
 $('saltGoParams').onclick = () => document.querySelector('.nav button[data-tab="salt"]').click();
@@ -4850,6 +4898,11 @@ function renderGradMap(A) {
   const num = (id, d) => { const v = parseFloat($(id).value); return isFinite(v) ? v : d; };
   const gsc = { ...sc, bands: Math.max(3, Math.round(num('gmBands', 12))), rampName: $('gmRamp').value };
   const scale = $('gmScale').value, layout = $('gmLayout').value, size = clamp(num('gmSize', 460), 240, 1400);
+  const hasCentre = Number.isFinite(sc.cx) && Number.isFinite(sc.cy);
+  const wantsFull = $('gmExtent').value === 'plate';
+  const fullPlate = wantsFull && hasCentre;
+  if (wantsFull && !hasCentre) host.appendChild(el('div', { class: 'note' },
+    'Showing the track region. Enter both plate centre coordinates above to show the full plate.'));
   const when = $('gmAt').value;
   const durs = A.rows.map(r => r.dur).filter(isFinite);
   const span = durs.length ? S.median(durs) : 0;
@@ -4869,11 +4922,12 @@ function renderGradMap(A) {
     xd = [Math.min(xd[0], s.x - m), Math.max(xd[1], s.x + m)];
     yd = [Math.min(yd[0], s.y - m), Math.max(yd[1], s.y + m)]; });
 
-  const plate = $('gmRing').checked && isFinite(sc.cx) && isFinite(sc.cy)
-    ? { cx: sc.cx / c.K, cy: sc.cy / c.K, dia: sc.plateDia, ring: sc.ring } : null;
+  const showRing = $('gmRing').checked;
+  const plate = hasCentre && (fullPlate || showRing)
+    ? { cx: sc.cx / c.K, cy: sc.cy / c.K, dia: sc.plateDia, ring: showRing ? sc.ring : 0 } : null;
   const base = { sc: gsc, size, equal: true, flipY: $('axFlipY').checked, sUnit: c.sUnit, scale,
     rampName: gsc.rampName, contour: $('gmContour').checked, labels: $('gmLabels').checked,
-    halo: $('gmHalo').checked, cbar: $('gmCbar').checked, markers: M, plate,
+    halo: $('gmHalo').checked, cbar: $('gmCbar').checked, markers: M, plate, fullPlate, tAdd,
     scaleBar: num('trkScale', 0) > 0 ? num('trkScale', 0) : 0 };
   const mkTrack = (w, color) => ({ xs: w.xs, ys: w.ys, color,
     marksA: mark && c.primary === 'A' ? w.evA : [], marksB: mark && c.primary === 'B' ? w.evB : [],
