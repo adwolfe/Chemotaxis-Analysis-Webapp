@@ -65,11 +65,16 @@ you the percentage of rows carrying each code and lets you choose which to keep 
 - A modelled salt gradient, and reorientation rate against concentration, ΔC, dC/dt and % change
 - Tracks and reorientation locations drawn over the modelled gradient field
 
-**Statistics.** Two groups: Welch's *t* and Mann–Whitney *U*. Three or more: one-way ANOVA with
-pairwise Welch tests, and Kruskal–Wallis with Dunn's post hoc — all Holm-corrected. A D'Agostino K²
-screen decides which family is reported as primary. The replicate unit is switchable between
-individual worm and plate; plate is the conservative choice when you have several plates per
-condition. The statistics library was verified digit-for-digit against SciPy.
+**Statistics.** Plate / file is the default replicate unit. With two conditions, the plate
+comparisons for runs, total distance, overall reorientation, and bearing slopes report a Welch
+test and a 95% confidence interval for the mean difference. They assume independent plates.
+Other comparisons retain the Welch and Mann–Whitney tests for two conditions, and ANOVA or
+Kruskal–Wallis with Holm-adjusted post hoc comparisons for three or more.
+
+**Bearing.** In plate mode, each bin rate is the number of reorientation starts divided by the
+total valid heading time across worms on that plate. The rate curve shows the plate mean and
+pointwise 95% confidence intervals. Each plate with at least three occupied bins contributes
+one regression slope. Optional per-bin plate comparisons use Holm-adjusted p-values.
 
 **No-gradient controls.** Mark a condition as *No gradient* and it is not skipped — it goes through
 identical code against the position the cue would have occupied. Every navigation and salt measure is
@@ -107,8 +112,11 @@ is also a map of where the animal was — which is what the no-gradient control 
 
 Everything the app shows can leave it.
 
-- **Per figure** — a button row under every panel: `CSV` (the numbers behind that figure, wide
-  format), `SVG`, `PNG`, `PDF`.
+- **Per figure** — `CSV` provides wide-format data with separate columns for each condition.
+  `Plate & worm CSV` on the runs, total distance, and overall reorientation plots groups rows by
+  condition and plate. `Plate bins CSV` on the bearing curve includes counts and exposure
+  time, and `Plate slopes CSV` identifies the slope and fit coverage for each plate.
+  Figures are also available as `SVG`, `PNG`, and `PDF`.
 - **`csv/`** — every table in long format, one file each, for scripting.
 - **`wide/column/`** — one column per condition, one row per replicate. Paste into GraphPad Prism as
   a Column table.

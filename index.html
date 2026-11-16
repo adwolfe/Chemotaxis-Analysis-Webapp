@@ -375,7 +375,7 @@ td.n,th.n{text-align:right;font-variant-numeric:tabular-nums;font-family:var(--m
     </div>
     <div id="reoFigs"><div class="empty">Load data first.</div></div>
     <div class="card"><h3>Statistics</h3><div id="reoStats"></div></div>
-    <div class="card"><h3>Per-replicate values</h3><div class="scroll" id="reoTable"></div></div>
+    <div class="card"><h3>Per-worm values</h3><div class="scroll" id="reoTable"></div></div>
   </section>
 
   <!-- ============ SPEED ============ -->
@@ -408,7 +408,7 @@ td.n,th.n{text-align:right;font-variant-numeric:tabular-nums;font-family:var(--m
     </div>
     <div id="spdFigs"><div class="empty">Load data first.</div></div>
     <div class="card"><h3>Statistics</h3><div id="spdStats"></div></div>
-    <div class="card"><h3>Per-replicate values</h3><div class="scroll" id="spdTable"></div></div>
+    <div class="card"><h3>Per-worm values</h3><div class="scroll" id="spdTable"></div></div>
   </section>
 
   <!-- ============ IRI ============ -->
@@ -429,7 +429,7 @@ td.n,th.n{text-align:right;font-variant-numeric:tabular-nums;font-family:var(--m
     </div>
     <div id="iriFigs"><div class="empty">Load data first.</div></div>
     <div class="card"><h3>Statistics</h3><div id="iriStats"></div></div>
-    <div class="card"><h3>Per-replicate values</h3><div class="scroll" id="iriTable"></div></div>
+    <div class="card"><h3>Per-worm values</h3><div class="scroll" id="iriTable"></div></div>
   </section>
 
   <!-- ============ NAVIGATION ============ -->
@@ -452,6 +452,7 @@ td.n,th.n{text-align:right;font-variant-numeric:tabular-nums;font-family:var(--m
           <input type="number" id="navDir" value="0" step="any"></div>
         <div style="min-width:140px"><label class="f">Bearing bins</label>
           <input type="number" id="navBins" value="8" step="1" min="3" max="24"></div>
+        <label class="chk"><input type="checkbox" id="navBinTests"> Compare rates within each bearing bin (exploratory)</label>
         <div style="min-width:140px"><label class="f">Shuffle iterations</label>
           <input type="number" id="shuffleN" value="500" step="100" min="20" max="5000"></div>
         <div style="min-width:250px"><label class="f">Reference for a no-gradient condition</label>
@@ -473,7 +474,7 @@ td.n,th.n{text-align:right;font-variant-numeric:tabular-nums;font-family:var(--m
     </div>
     <div id="navFigs"><div class="empty">Load data and mark a source first.</div></div>
     <div class="card"><h3>Statistics</h3><div id="navStats"></div></div>
-    <div class="card"><h3>Per-replicate values</h3><div class="scroll" id="navTable"></div></div>
+    <div class="card"><h3>Per-worm values</h3><div class="scroll" id="navTable"></div></div>
   </section>
 
   <!-- ============ ROAMING & DWELLING ============ -->
@@ -898,16 +899,17 @@ td.n,th.n{text-align:right;font-variant-numeric:tabular-nums;font-family:var(--m
       <div class="grid g3">
         <div>
           <label class="f">Replicate unit (n)</label>
-          <select id="nUnit"><option value="worm">Individual worm</option><option value="file">Plate / file</option></select>
+          <select id="nUnit"><option value="worm">Individual worm</option><option value="file" selected>Plate / file</option></select>
         </div>
         <div>
           <label class="f">Error bars</label>
-          <select id="errBar"><option value="sem">Mean ± SEM</option><option value="sd">Mean ± SD</option><option value="ci">Mean ± 95% CI</option><option value="iqr">Median &amp; IQR</option></select>
+          <select id="errBar"><option value="sem">Mean ± SEM</option><option value="sd">Mean ± SD</option><option value="ci" selected>Mean ± 95% CI</option><option value="iqr">Median &amp; IQR</option></select>
         </div>
         <div>
           <label class="f">Bars behind the points</label>
-          <select id="barsOn"><option value="yes">Show bars</option><option value="no">Points and error bars only</option></select>
+          <select id="barsOn"><option value="yes">Show bars</option><option value="no" selected>Points and error bars only</option></select>
         </div>
+        <label class="chk"><input type="checkbox" id="wormOverlay" checked> Show individual worms behind plate summaries for runs, distance and reorientations</label>
         <div>
           <label class="f">Y axis on comparison plots</label>
           <select id="yAxisMode">
@@ -1035,6 +1037,17 @@ S.betai = (a, b, x) => { if (x <= 0) return 0; if (x >= 1) return 1;
   const bt = Math.exp(S.logGamma(a + b) - S.logGamma(a) - S.logGamma(b) + a * Math.log(x) + b * Math.log(1 - x));
   return x < (a + 1) / (a + b + 2) ? bt * S.betacf(a, b, x) / a : 1 - bt * S.betacf(b, a, 1 - x) / b; };
 S.tPval = (t, df) => (df <= 0 || !isFinite(t)) ? NaN : S.betai(df / 2, .5, df / (df + t * t));
+S.t95 = df => {
+  if (!(df >= 1)) return NaN;
+  // The largest 95% critical value for df >= 1 is 12.7062.
+  let lo = 0, hi = 16;
+  for (let i = 0; i < 40; i++) {
+    const mid = (lo + hi) / 2;
+    if (S.tPval(mid, df) > .05) lo = mid; else hi = mid;
+  }
+  return (lo + hi) / 2;
+};
+S.meanCI = a => a.length > 1 ? S.sem(a) * S.t95(a.length - 1) : NaN;
 S.fPval = (f, d1, d2) => (!isFinite(f) || f <= 0) ? NaN : S.betai(d2 / 2, d1 / 2, d2 / (d2 + d1 * f));
 S.gammap = (a, x) => { if (x <= 0) return 0;
   if (x < a + 1) { let ap = a, sum = 1 / a, del = sum;
@@ -1055,10 +1068,13 @@ S.erf = x => { const s = x < 0 ? -1 : 1; x = Math.abs(x);
 S.welch = (a, b) => { const na = a.length, nb = b.length; if (na < 2 || nb < 2) return null;
   const ma = S.mean(a), mb = S.mean(b), va = S.sd(a) ** 2, vb = S.sd(b) ** 2;
   const se = Math.sqrt(va / na + vb / nb); if (!se) return null;
-  const t = (ma - mb) / se;
+  const difference = ma - mb;
+  const t = difference / se;
   const df = (va / na + vb / nb) ** 2 / ((va / na) ** 2 / (na - 1) + (vb / nb) ** 2 / (nb - 1));
   const sp = Math.sqrt(((na - 1) * va + (nb - 1) * vb) / (na + nb - 2));
-  return { t, df, p: S.tPval(t, df), d: sp ? (ma - mb) / sp : NaN }; };
+  const margin = se * S.t95(df);
+  return { t, df, p: S.tPval(t, df), d: sp ? difference / sp : NaN,
+    difference, lower: difference - margin, upper: difference + margin }; };
 
 S.ranks = arr => { const idx = arr.map((v, i) => [v, i]).sort((x, y) => x[0] - y[0]); const r = new Array(arr.length); let i = 0, tieSum = 0;
   while (i < idx.length) { let j = i; while (j + 1 < idx.length && idx[j + 1][0] === idx[i][0]) j++;
@@ -1509,6 +1525,7 @@ function cfg() {
     dropZero: $('dropZero').checked,
     qual: new Set([...ST.qualOn]),
     barsOn: $('barsOn') ? $('barsOn').value === 'yes' : true,
+    wormOverlay: $('wormOverlay').checked,
     yAxisMode: $('yAxisMode') ? $('yAxisMode').value : 'auto',
     spdMeasure: $('spdMeasure') ? $('spdMeasure').value : 'mean',
     distMeasure: $('distMeasure') ? $('distMeasure').value : 'both',
@@ -1517,6 +1534,7 @@ function cfg() {
     navMode: $('navMode') ? $('navMode').value : 'point',
     navDir: num('navDir', 0),
     navBins: Math.max(3, Math.round(num('navBins', 8))),
+    navBinTests: $('navBinTests').checked,
     wvBins: Math.max(3, Math.round(num('wvBins', 12))),
     wvLimit: num('wvLimit', 180),
     shuffleN: Math.max(20, Math.round(num('shuffleN', 500))),
@@ -1924,14 +1942,14 @@ function addNav(w, c, geom) {
   const timeIn = new Array(nb).fill(0), cnt = new Array(nb).fill(0);
   const binOf = v => clampNum(Math.floor((v + 1) / 2 * nb), 0, nb - 1);
   for (let i = 0; i < n - 1; i++) if (cosB[i] != null) timeIn[binOf(cosB[i])] += dt;
-  ev.forEach(e => { const i = Math.max(0, e.span[0] - 1);
-    if (cosB[i] != null) cnt[binOf(cosB[i])]++; });
-  const rateBins = [], xs = [], ys = [];
+  ev.forEach(e => { const bearing = cosB[e.span[0] - 1];
+    if (bearing != null) cnt[binOf(bearing)]++; });
+  const rateCfg = bearingRateConfig(c);
+  const rateBins = [];
   for (let k = 0; k < nb; k++) { const mid = (edges[k] + edges[k + 1]) / 2;
-    const r = timeIn[k] > 0 ? rateOf(cnt[k], timeIn[k], c) : NaN;
-    rateBins.push({ x0: edges[k], x1: edges[k + 1], mid, mean: r, sem: NaN, n: cnt[k], time: timeIn[k] });
-    if (isFinite(r) && timeIn[k] >= 2 * dt) { xs.push(mid); ys.push(r); } }
-  const fit = linFit(xs, ys);
+    const r = rateOf(cnt[k], timeIn[k], rateCfg);
+    rateBins.push({ x0: edges[k], x1: edges[k + 1], mid, mean: r, n: cnt[k], time: timeIn[k] }); }
+  const fit = fitBearingBins(rateBins, 2 * dt);
 
   /* ---- weathervaning: signed curving rate during runs, against signed bearing ---- */
   const wb = c.wvBins, lim = clampNum(c.wvLimit, 10, 180), we = [];
@@ -1968,10 +1986,32 @@ function addNav(w, c, geom) {
   }
 
   w.nav = { noGrad: !!geom.noGrad, randomRef: !!geom.random,
-    beta, cosB, rateBins, slope: fit.slope, r2: fit.r2,
+    beta, cosB, rateBins, fit, slope: fit.slope, r2: fit.r2,
     wvBins, wvSlope: wvFit.slope, wvR2: wvFit.r2,
     dBearing: dB, meanDBearing: S.mean(dB), shuffle,
     meanCos: S.mean(cosB.filter(v => v != null)) };
+}
+function bearingRateConfig(c) {
+  return c.rateUnit === 'track' ? { ...c, rateUnit: 'min' } : c;
+}
+function fitBearingBins(bins, minTime = 0) {
+  const used = bins.filter(b => b.time > 0 && b.time >= minTime);
+  return { ...linFit(used.map(b => b.mid), used.map(b => b.mean)), n: used.length };
+}
+function plateBearingRates(worms, rateCfg) {
+  const files = new Map();
+  worms.forEach(w => {
+    if (!files.has(w.fileId)) files.set(w.fileId, { fileId: w.fileId, file: w.file, worms: [] });
+    files.get(w.fileId).worms.push(w);
+  });
+  return [...files.values()].map(({ fileId, file, worms: ws }) => {
+    const bins = ws[0].nav.rateBins.map(({ x0, x1, mid }, k) => {
+      let time = 0, n = 0;
+      ws.forEach(w => { const b = w.nav.rateBins[k]; time += b.time; n += b.n; });
+      return { x0, x1, mid, time, n, mean: rateOf(n, time, rateCfg) };
+    });
+    return { fileId, file, bins, fit: fitBearingBins(bins), wormCount: ws.length };
+  });
 }
 function linFit(x, y) {
   const n = x.length; if (n < 3) return { slope: NaN, intercept: NaN, r2: NaN };
@@ -2307,26 +2347,40 @@ function runAnalysis() {
 }
 
 /* aggregate per replicate unit */
-function replicates(field) {
-  const A = ST.analysis, c = A.c;
+function replicates(field, unit = ST.analysis.c.nUnit) {
+  const A = ST.analysis;
   return A.conds.map(cd => {
-    const rs = A.rows.filter(r => r.condId === cd.id);
-    let vals, labels;
-    if (c.nUnit === 'file') {
+    const worms = A.rows.filter(r => r.condId === cd.id)
+      .map(r => ({ file: r.file, fileId: r.fileId, worm: r.worm, dur: r.dur, value: field(r) }))
+      .filter(r => Number.isFinite(r.value));
+    let entries = worms;
+    if (unit === 'file') {
       const byFile = new Map();
-      rs.forEach(r => { if (!byFile.has(r.fileId)) byFile.set(r.fileId, { name: r.file, v: [] }); byFile.get(r.fileId).v.push(field(r)); });
-      const arr = [...byFile.values()].map(o => ({ label: o.name, v: S.mean(o.v.filter(isFinite)) }));
-      vals = arr.map(o => o.v); labels = arr.map(o => o.label);
-    } else { vals = rs.map(field); labels = rs.map(r => `${r.file} · worm ${r.worm}`); }
-    const keep = vals.map((v, i) => [v, labels[i]]).filter(x => isFinite(x[0]));
-    return { name: cd.name, color: cd.color, id: cd.id, values: keep.map(x => x[0]), labels: keep.map(x => x[1]) };
+      worms.forEach(w => {
+        if (!byFile.has(w.fileId)) byFile.set(w.fileId, { file: w.file, fileId: w.fileId, worms: [] });
+        byFile.get(w.fileId).worms.push(w);
+      });
+      entries = [...byFile.values()].map(e => ({ ...e, value: S.mean(e.worms.map(w => w.value)) }));
+    }
+    return { name: cd.name, color: cd.color, id: cd.id, worms, entries, values: entries.map(e => e.value),
+      labels: entries.map(e => unit === 'file' ? e.file : `${e.file} · worm ${e.worm}`) };
   }).filter(g => g.values.length);
 }
 
-function statsFor(groups) {
+function statsFor(groups, plateComparison = false) {
   const g = groups.map(x => x.values);
   const out = { n: groups.map(x => x.values.length), names: groups.map(x => x.name), pairs: [] };
   if (groups.length < 2) { out.msg = 'Add a second condition to run a comparison.'; return out; }
+  out.plateComparison = plateComparison && groups.length === 2;
+  if (out.plateComparison) {
+    out.design = 'two independent groups';
+    out.para = S.welch(g[0], g[1]);
+    out.primaryName = out.paraName = "Welch's unpaired t-test";
+    out.difference = S.mean(g[0]) - S.mean(g[1]);
+    out.primaryP = out.para?.p;
+    if (out.para) out.pairs.push({ i: 0, j: 1, p: out.para.p, padj: out.para.p });
+    return out;
+  }
   const norm = g.map(x => S.shapiroLike(x));
   out.normality = norm.map((r, i) => ({ name: groups[i].name, p: r ? r.p : NaN }));
   out.anyNonNormal = norm.some(r => r && isFinite(r.p) && r.p < 0.05);
@@ -2787,13 +2841,14 @@ function dotFig(title, groups, ylab, st, opt = {}) {
   const lineH = fs + 2.5;
 
   /* ---- vertical range: driven by the data, not by an arbitrary zero ---- */
-  const vals = [];
-  groups.forEach(g => { g.values.forEach(v => { if (isFinite(v)) vals.push(v); });
+  const summaries = groups.map(g => {
     const useMed = opt.errBar === 'iqr';
-    const c0 = useMed ? S.median(g.values) : S.mean(g.values);
-    const e = useMed ? null : (opt.errBar === 'sd' ? S.sd(g.values) : opt.errBar === 'ci' ? S.sem(g.values) * 1.96 : S.sem(g.values));
-    const a = useMed ? S.quantile(g.values, .25) : c0 - e, b = useMed ? S.quantile(g.values, .75) : c0 + e;
-    [c0, a, b].forEach(v => { if (isFinite(v)) vals.push(v); }); });
+    const centre = useMed ? S.median(g.values) : S.mean(g.values);
+    const margin = opt.errBar === 'sd' ? S.sd(g.values) : opt.errBar === 'ci' ? S.meanCI(g.values) : S.sem(g.values);
+    return { centre, lower: useMed ? S.quantile(g.values, .25) : centre - margin,
+      upper: useMed ? S.quantile(g.values, .75) : centre + margin };
+  });
+  const vals = groups.flatMap((g, i) => [...g.values, ...(g.background || []), ...Object.values(summaries[i])]).filter(isFinite);
   let dmin = vals.length ? minOf(vals) : 0, dmax = vals.length ? maxOf(vals) : 1;
   if (!isFinite(dmin) || !isFinite(dmax)) { dmin = 0; dmax = 1; }
   if (dmax === dmin) { const p = Math.abs(dmax) * .05 || .5; dmin -= p; dmax += p; }
@@ -2804,7 +2859,7 @@ function dotFig(title, groups, ylab, st, opt = {}) {
      actually occupy a decent share of it. Otherwise drop the bars and zoom in. */
   const zeroFar = (dmin > 0 && span < .35 * dmax) || (dmax < 0 && span < .35 * -dmin);
   const mode = opt.yMode || 'auto';
-  const includeZero = mode === 'zero' ? true : mode === 'data' ? false : (wantBars && !zeroFar);
+  const includeZero = opt.referenceZero || mode === 'zero' || (mode === 'auto' && wantBars && !zeroFar);
   const bars = wantBars && includeZero;
   const truncated = wantBars && !includeZero;
 
@@ -2846,26 +2901,27 @@ function dotFig(title, groups, ylab, st, opt = {}) {
 
   groups.forEach((g, i) => {
     const X = cx(i), v = g.values;
-    const useMed = opt.errBar === 'iqr';
-    const centre = useMed ? S.median(v) : S.mean(v);
-    let lo2, hi2;
-    if (useMed) { lo2 = S.quantile(v, .25); hi2 = S.quantile(v, .75); }
-    else { const e = opt.errBar === 'sd' ? S.sd(v) : opt.errBar === 'ci' ? S.sem(v) * 1.96 : S.sem(v);
-      lo2 = centre - e; hi2 = centre + e; }
+    const { centre, lower: lo2, upper: hi2 } = summaries[i];
     const barHalf = Math.min(32, colW * .28), capHalf = barHalf / 3;
     if (bars && isFinite(centre)) { const yb = A.sy(Math.max(0, yd[0])), yc = A.sy(centre);
       fig.rect(X - barHalf, Math.min(yb, yc), 2 * barHalf, Math.abs(yb - yc), { fill: g.color, op: .18 }); }
+    if (g.background?.length) {
+      const radius = 1.7;
+      const offsets = swarmOffsets(g.background, A.sy, colW * .38 - radius, radius);
+      g.background.forEach((value, k) => fig.circle(X + offsets[k], A.sy(value), radius, { fill: g.color, op: .23 }));
+    }
     if (isFinite(lo2) && isFinite(hi2)) { fig.line(X, A.sy(lo2), X, A.sy(hi2), { stroke: g.color, sw: 1.6 });
       fig.line(X - capHalf, A.sy(hi2), X + capHalf, A.sy(hi2), { stroke: g.color, sw: 1.6 });
       fig.line(X - capHalf, A.sy(lo2), X + capHalf, A.sy(lo2), { stroke: g.color, sw: 1.6 }); }
     if (isFinite(centre)) fig.line(X - barHalf, A.sy(centre), X + barHalf, A.sy(centre), { stroke: g.color, sw: 2.4 });
     // individual replicates, laid out as a symmetric beeswarm around the column centre
-    const pr = clamp(2.9 - Math.max(0, v.length - 14) * .05, 1.6, 2.9);
+    const pr = opt.platePoints ? 4.2 : clamp(2.9 - Math.max(0, v.length - 14) * .05, 1.6, 2.9);
     const off = swarmOffsets(v, A.sy, colW * .38 - pr, pr);
-    v.forEach((val, k) => fig.circle(X + off[k], A.sy(val), pr, { fill: g.color, op: .68, stroke: '#ffffff', sw: .5 }));
+    v.forEach((val, k) => fig.circle(X + off[k], A.sy(val), pr, { fill: g.color, op: opt.platePoints ? .96 : .68, stroke: '#ffffff', sw: .6 }));
     let ly = B.y1 + 14 + fs * .8;
     lines[i].forEach(t => { fig.text(X, ly, t, { size: fs, anchor: 'middle', fill: INK.text }); ly += lineH; });
-    fig.text(X, B.y1 + 14 + nLines * lineH + 8, `n = ${v.length}`, { size: 9.5, anchor: 'middle', fill: INK.tick });
+    const count = opt.platePoints ? `${v.length} plate${v.length === 1 ? '' : 's'}` : v.length;
+    fig.text(X, B.y1 + 14 + nLines * lineH + 8, `n = ${count}`, { size: 9.5, anchor: 'middle', fill: INK.tick });
     if (g.note) fig.text(X, B.y1 + 14 + nLines * lineH + 20, g.note, { size: 9, anchor: 'middle', fill: '#a35c00' });
   });
 
@@ -2873,12 +2929,9 @@ function dotFig(title, groups, ylab, st, opt = {}) {
   if (levels) {
     const sorted = [...pairs].sort((a, b) => (a.j - a.i) - (b.j - b.i));
     let lvl = 0;
-    const topOf = g => { const m = maxOf(g.values.filter(isFinite));
-      const e = opt.errBar === 'iqr' ? S.quantile(g.values, .75) : S.mean(g.values) + S.sem(g.values);
-      return Math.max(isFinite(m) ? m : -Infinity, isFinite(e) ? e : -Infinity); };
+    const tops = groups.map((g, i) => maxOf([...g.values, ...(g.background || []), summaries[i].upper]));
     sorted.slice(0, 6).forEach(p => { const pv = p.padj != null ? p.padj : p.p;
-      const localTop = Math.max(topOf(groups[p.i]), topOf(groups[p.j]),
-        ...groups.slice(Math.min(p.i, p.j), Math.max(p.i, p.j) + 1).map(topOf));
+      const localTop = Math.max(...tops.slice(Math.min(p.i, p.j), Math.max(p.i, p.j) + 1));
       const yy = clamp(A.sy(isFinite(localTop) ? localTop : yd[1]) - 12 - lvl * 17, B.y0 + 11, B.y1 - 4);
       lvl++;
       const a = cx(p.i), b = cx(p.j);
@@ -3000,7 +3053,11 @@ function timeCourseFig(title, series, xlab, ylab, mode, forceY) {
   const W = Math.max(520, Math.min(1100, 90 + nB * Math.max(16, 13 * series.length))), H = 348;
   const fig = new Fig(W, H, title);
   if (!nB) return fig;
-  const vals = series.flatMap(s => s.bins.flatMap(b => [b.mean, (b.mean || 0) + (b.sem || 0), (b.mean || 0) - (b.sem || 0)])).filter(isFinite);
+  const error = b => mode === 'fit' ? b.ci : b.sem;
+  const vals = series.flatMap(s => [
+    ...s.bins.flatMap(b => [b.mean, b.mean + error(b), b.mean - error(b)]),
+    ...(s.fitLine || []).map(p => p[1])
+  ]).filter(isFinite);
   let lo = minOf(vals), hi = maxOf(vals);
   if (!isFinite(lo) || !isFinite(hi)) { lo = 0; hi = 1; }
   if (mode === 'bar' || (lo <= 0 && hi >= 0)) lo = Math.min(0, lo);   // bars must sit on zero
@@ -3030,12 +3087,15 @@ function timeCourseFig(title, series, xlab, ylab, mode, forceY) {
         else if (seg.length) { segs.push(seg); seg = []; } });
       if (seg.length) segs.push(seg);
       const pts = segs.flat();
-      s.bins.forEach(b => { if (!isFinite(b.mean) || !isFinite(b.sem) || !b.sem) return;
+      s.bins.forEach(b => { const margin = error(b);
+        if (!isFinite(b.mean) || !isFinite(margin) || !margin) return;
         const X = A.sx(b.mid);
-        fig.line(X, A.sy(b.mean - b.sem), X, A.sy(b.mean + b.sem), { stroke: s.color, sw: 1.1, op: .8 });
-        fig.line(X - 3, A.sy(b.mean + b.sem), X + 3, A.sy(b.mean + b.sem), { stroke: s.color, sw: 1.1, op: .8 });
-        fig.line(X - 3, A.sy(b.mean - b.sem), X + 3, A.sy(b.mean - b.sem), { stroke: s.color, sw: 1.1, op: .8 }); });
-      segs.forEach(g => { if (g.length > 1) fig.poly(g, { stroke: s.color, sw: 1.9, dash: s.dash }); });
+        fig.line(X, A.sy(b.mean - margin), X, A.sy(b.mean + margin), { stroke: s.color, sw: 1.1, op: .8 });
+        fig.line(X - 3, A.sy(b.mean + margin), X + 3, A.sy(b.mean + margin), { stroke: s.color, sw: 1.1, op: .8 });
+        fig.line(X - 3, A.sy(b.mean - margin), X + 3, A.sy(b.mean - margin), { stroke: s.color, sw: 1.1, op: .8 }); });
+      if (mode === 'fit') {
+        if (s.fitLine?.length) fig.poly(s.fitLine.map(([x, y]) => [A.sx(x), A.sy(y)]), { stroke: s.color, sw: 1.9, dash: '5,4' });
+      } else segs.forEach(g => { if (g.length > 1) fig.poly(g, { stroke: s.color, sw: 1.9, dash: s.dash }); });
       pts.forEach(p => fig.circle(p[0], p[1], 2.6, { fill: s.color, stroke: '#ffffff', sw: .6 })); });
   }
   legendRow(fig, series.map(s => ({ label: s.name + (s.dash ? ' (no gradient)' : ''), color: s.color })), H - 22, pad.l, W - pad.r);
@@ -3359,11 +3419,11 @@ function renderChips(A) {
 
 /* ---- inputs ---- */
 const WATCH = ['fps','pxmm','rateUnit','smoothWin','smoothMethod','sgOrder','dt','minDisp','omegaThr','tcrit','methodACount','angThr','angWin','refrac',
- 'primary','nUnit','errBar','barsOn','yAxisMode','maxStep','minFrames','minPath','dropZero','axAuto','axEqual','axFlipY','axOrigin',
+ 'primary','nUnit','errBar','barsOn','wormOverlay','yAxisMode','maxStep','minFrames','minPath','dropZero','axAuto','axEqual','axFlipY','axOrigin',
  'axXmin','axXmax','axYmin','axYmax','trkLayout','trkMark','trkSize','trkColor','trkStart','trkEnd',
  'trkLW','trkOp','trkScale','trkGrid','spdMeasure','distMeasure','showEff','iriStat','iriDist','iriCensor','iriSpeed',
  'tcMetric','tcBin','tcMode','tcNorm','tcPerCond',
- 'navMode','navDir','navBins','wvBins','wvLimit','shuffleN','noGradRef','zipSource','roamBin','roamThr','showMSD','msdMaxFrac','msdRefLag',
+ 'navMode','navDir','navBins','navBinTests','wvBins','wvLimit','shuffleN','noGradRef','zipSource','roamBin','roamThr','showMSD','msdMaxFrac','msdRefLag',
  'mkAShape','mkASize','mkAColor','mkAWidth','mkAFill','mkBShape','mkBSize','mkBColor','mkBWidth','mkBFill',
  'mkCShape','mkCSize','mkCColor','mkCWidth','mkCFill',
  'mkSShape','mkSSize','mkSColor','mkSWidth','mkSFill','mkSAuto','mkEShape','mkESize','mkEColor','mkEWidth','mkEFill','mkEAuto',
@@ -3411,16 +3471,29 @@ function wideFromGroups(name, groups) {           // one column per condition, o
   for (let i = 0; i < maxN; i++) rows.push(g.map(x => x.values[i] == null || !isFinite(x.values[i]) ? '' : x.values[i]));
   return { name, rows };
 }
-function wideFromSeries(name, series, xlab) {     // X down the side, mean / SEM / N per condition
+function metricReplicateTable(name, plates, ylab, timeUnit) {
+  const rows = [['Condition', 'Plate file', 'Plate ID', 'Worm ID', 'Unit', ylab, `Track duration (${timeUnit})`, 'Worms contributing']];
+  plates.forEach(g => g.entries.forEach(p => {
+    rows.push([g.name, p.file, p.fileId, '', 'Plate', p.value, '', p.worms.length]);
+    p.worms.forEach(w => rows.push([g.name, p.file, p.fileId, w.worm, 'Worm', w.value, w.dur, '']));
+  }));
+  return { name, rows };
+}
+function wideFromSeries(name, series, xlab, showFit = false) {
   const s = (series || []).filter(x => x && x.bins && x.bins.length);
   if (!s.length) return null;
   const head = [`X — ${xlab} (bin centre)`, 'bin from', 'bin to'];
-  s.forEach(x => head.push(`${x.name} — mean`, `${x.name} — SEM`, `${x.name} — N`));
+  s.forEach(x => {
+    head.push(`${x.name} — mean`, `${x.name} — SEM`, `${x.name} — N`);
+    if (showFit) head.push(`${x.name} — 95% CI lower`, `${x.name} — 95% CI upper`, `${x.name} — fitted rate`);
+  });
   const nB = s[0].bins.length, rows = [head];
   for (let k = 0; k < nB; k++) {
     const b0 = s[0].bins[k], r = [b0.mid, b0.x0, b0.x1];
     s.forEach(x => { const b = x.bins[k] || {};
-      r.push(isFinite(b.mean) ? b.mean : '', isFinite(b.sem) ? b.sem : '', b.n == null ? '' : b.n); });
+      r.push(b.mean, b.sem, b.n);
+      if (showFit) r.push(b.mean - b.ci, b.mean + b.ci, b.fitted);
+    });
     rows.push(r);
   }
   return { name, rows };
@@ -3556,6 +3629,11 @@ function figCard(key, fig, subtitle, opt = {}) {
       const enc = t => new TextEncoder().encode(t);
       saveBlob(makeZip(wides.map(w => ({ name: safeName(w.name) + '.csv', data: enc(toCSV(w.rows)) }))),
         safeName(fig.title) + '_data.zip'); } }, 'CSV'));
+  if (opt.csv) {
+    const { name, rows } = opt.csv;
+    bar.appendChild(el('button', { class: 'btn sm',
+      onclick: () => saveBlob(new Blob([toCSV(rows)], { type: 'text/csv' }), safeName(name) + '.csv') }, opt.csvLabel));
+  }
   [['SVG', () => saveBlob(figSVGBlob(fig), safeName(fig.title) + '.svg')],
    ['PNG', async () => { const b = await figPNGBlob(fig); if (b) saveBlob(b, safeName(fig.title) + '.png'); }],
    ['PDF', () => saveBlob(figPDFBlob(fig), safeName(fig.title) + '.pdf')]]
@@ -3588,14 +3666,21 @@ function setAxisRange(x0, x1, y0, y1) {
 }
 
 /* ---- stats block ---- */
-function statsHTML(st, unitLabel) {
+function statsHTML(st) {
   if (!st || st.msg) return `<div class="empty">${st ? st.msg : 'No data.'}</div>`;
   const rows = [];
   rows.push(`<div class="statbox"><p style="margin:0 0 10px">Design: <b>${st.design}</b> · replicate unit: <b>${cfg().nUnit === 'file' ? 'plate / file' : 'individual worm'}</b> · n = ${st.n.join(', ')}</p></div>`);
-  const nt = st.normality.map(o => `${o.name}: p = ${fmtP(o.p)}`).join(' · ');
-  rows.push(`<div class="note">Normality screen (D'Agostino K², advisory only) — ${nt}. ${st.anyNonNormal
-    ? 'At least one group departs from normality, so the <b>non-parametric</b> test is reported as primary.'
-    : 'No strong departure from normality detected, so the <b>parametric</b> test is reported as primary.'}</div>`);
+  if (st.plateComparison) {
+    const comparison = `${escXml(st.names[0])} − ${escXml(st.names[1])}`;
+    rows.push(`<div class="note"><b>${comparison}</b> mean difference = <b>${fmt(st.difference)}</b>
+      ${st.para ? `(95% CI ${fmt(st.para.lower)} to ${fmt(st.para.upper)})` : '· CI and p-value unavailable (requires at least two plates per condition and nonzero standard error).'}
+      The test assumes independent plates. Use the plate export for matched days or batches.</div>`);
+  } else {
+    const screened = st.normality.filter(o => Number.isFinite(o.p));
+    const nt = screened.map(o => `${escXml(o.name)}: p = ${fmtP(o.p)}`).join(' · ');
+    rows.push(`<div class="note">${nt ? `Normality screen (D'Agostino K²) · ${nt}. ${st.primaryName} is shown on the plot.`
+      : 'Normality screen unavailable. The plot uses the parametric test when calculable.'}</div>`);
+  }
   const t = [];
   t.push('<table><thead><tr><th>Test</th><th class="n">Statistic</th><th class="n">df</th><th class="n">p</th><th></th></tr></thead><tbody>');
   if (st.para) { const p = st.para;
@@ -3621,11 +3706,20 @@ function statsHTML(st, unitLabel) {
   return rows.join('');
 }
 
+function registerPlateComparison(key, st) {
+  if (!st.plateComparison) return;
+  const w = st.para;
+  ST.tables[key + '_plate_comparison'] = { name: key + '_plate_comparison', rows: [
+    ['Condition A', 'Condition B', 'Plates A', 'Plates B', 'Mean difference (A − B)', '95% CI lower', '95% CI upper', 'Welch p (two-sided)'],
+    [...st.names, ...st.n, st.difference, w?.lower, w?.upper, w?.p]
+  ] };
+}
+
 function tableHTML(key, name, header, rows) {
   ST.tables[key] = { name, rows: [header, ...rows] };
   const num = header.map((h, i) => rows.length ? typeof rows[0][i] === 'number' : false);
   return `<table><thead><tr>${header.map((h, i) => `<th class="${num[i] ? 'n' : ''}">${h}</th>`).join('')}</tr></thead><tbody>` +
-    rows.map(r => `<tr>${r.map((v, i) => `<td class="${num[i] ? 'n' : ''}">${typeof v === 'number' ? fmt(v) : v}</td>`).join('')}</tr>`).join('') +
+    rows.map(r => `<tr>${r.map((v, i) => `<td class="${num[i] ? 'n' : ''}">${typeof v === 'number' ? fmt(v) : escXml(v ?? '')}</td>`).join('')}</tr>`).join('') +
     '</tbody></table>';
 }
 
@@ -3896,11 +3990,26 @@ function renderMetric(A, which) {
 
   /* one dot-plot panel + its statistics, registered for export */
   function panel(key, title, field, ylab, caption) {
-    const groups = replicates(field);
+    const plateMetric = ['reorientations', 'total_distance', 'run_duration', 'run_distance'].includes(key);
+    const platePoints = plateMetric && c.nUnit === 'file';
+    const plates = plateMetric ? replicates(field, 'file') : null;
+    const groups = platePoints ? plates : replicates(field);
     if (!groups.length) return null;
-    const st = statsFor(groups);
-    grid.appendChild(figCard(key, dotFig(title, groups, ylab, st, { errBar: c.errBar, h: 300, bars: c.barsOn, yMode: c.yAxisMode }), caption, { wide: wideFromGroups(key, groups) }));
+    const st = statsFor(groups, platePoints);
+    const overlay = platePoints && c.wormOverlay;
+    if (overlay) groups.forEach(g => { g.background = g.worms.map(w => w.value); });
+    let csv;
+    if (plateMetric) {
+      csv = metricReplicateTable(key + '_plates_and_worms', plates, ylab, c.tUnit);
+      ST.tables[csv.name] = csv;
+      if (platePoints) caption += overlay ? ' Large dots are plate means. Faint dots are worms.' : ' Each dot is a plate mean.';
+      else caption += ' Each dot is a worm.';
+    }
+    const plot = dotFig(title, groups, ylab, st,
+      { errBar: c.errBar, h: 300, bars: c.barsOn, yMode: c.yAxisMode, platePoints });
+    grid.appendChild(figCard(key, plot, caption, { wide: wideFromGroups(key, groups), csv, csvLabel: 'Plate & worm CSV' }));
     blocks.push({ title, st });
+    registerPlateComparison(key, st);
     ST.tables[key + '_group_summary'] = { name: key + '_group_summary',
       rows: [['Condition', 'n', 'Mean', 'SD', 'SEM', 'Median', 'Q1', 'Q3'],
         ...groups.map(g => [g.name, g.values.length, S.mean(g.values), S.sd(g.values), S.sem(g.values),
@@ -3921,7 +4030,7 @@ function renderMetric(A, which) {
   /* ---------------- reorientations ---------------- */
   if (which === 'reo') {
     panel('reorientations', `Reorientation rate (method ${P})`, rateP, rateLabel(c),
-      `Points are individual ${c.nUnit === 'file' ? 'plates' : 'worms'}; bar = ${c.errBar === 'iqr' ? 'median, whiskers = IQR' : 'mean, whiskers = ' + c.errBar.toUpperCase()}`);
+      'Turn frequency averaged from the individual track rates.');
     const other = P === 'A' ? 'B' : 'A';
     panel('reorientations_method_' + other, `Reorientation rate (method ${other})`,
       r => other === 'A' ? r.rateA : r.rateB, rateLabel(c),
@@ -3990,7 +4099,7 @@ function renderMetric(A, which) {
     const lab = c.iriStat === 'median' ? 'Median' : 'Mean';
     panel('run_duration', `Run duration (method ${P})`,
       r => { const a = evOf(r); return a ? agg(a.map(o => o.t)) : NaN; }, `run duration (${c.tUnit})`,
-      `${lab} time between consecutive reorientations, one point per ${c.nUnit === 'file' ? 'plate' : 'worm'}`);
+      `${lab} time between consecutive reorientations per worm.`);
     const runDurG = pooledBy(r => (evOf(r) || []).map(o => o.t));
     grid.appendChild(figCard('run_duration_distribution',
       distFig('Distribution of run durations', runDurG, `run duration (${c.tUnit})`, $('iriDist').value),
@@ -3998,7 +4107,7 @@ function renderMetric(A, which) {
       { wide: wideFromGroups('run_durations_pooled', runDurG) }));
     panel('run_distance', `Run distance (method ${P})`,
       r => { const a = evOf(r); return a ? agg(a.map(o => o.d)) : NaN; }, `run distance (${c.sUnit})`,
-      `${lab} path length covered between consecutive reorientations`);
+      `${lab} path length covered between consecutive reorientations per worm.`);
     const runDistG = pooledBy(r => (evOf(r) || []).map(o => o.d));
     grid.appendChild(figCard('run_distance_distribution',
       distFig('Distribution of run distances', runDistG, `run distance (${c.sUnit})`, $('iriDist').value),
@@ -4094,10 +4203,18 @@ function renderTimeCourse(A) {
   }
 
   const series = A.conds.map(cd => {
-    const per = cd.used.filter(w => P !== 'C' || w.hasCL).map(perWorm);
-    if (!per.length) return null;
+    const worms = cd.used.filter(w => P !== 'C' || w.hasCL);
+    if (!worms.length) return null;
+    const byReplicate = new Map();
+    worms.forEach(w => {
+      const key = c.nUnit === 'file' ? w.fileId : w;
+      if (!byReplicate.has(key)) byReplicate.set(key, []);
+      byReplicate.get(key).push(perWorm(w));
+    });
+    const per = [...byReplicate.values()];
     const bins = [];
-    for (let b = 0; b < nBins; b++) { const v = per.map(p => p[b]).filter(isFinite);
+    for (let b = 0; b < nBins; b++) { const v = per
+      .map(tracks => S.mean(tracks.map(track => track[b]).filter(Number.isFinite))).filter(Number.isFinite);
       bins.push({ x0: b * bin, x1: (b + 1) * bin, mid: (b + .5) * bin, values: v,
         mean: S.mean(v), sem: S.sem(v), n: v.length }); }
     return { name: cd.name, color: cd.color, bins };
@@ -4137,8 +4254,8 @@ function renderTimeCourse(A) {
   /* per-bin comparison */
   const rowsT = [], statRows = [];
   for (let b = 0; b < nBins; b++) {
-    const gs = series.map(s => s.bins[b]).filter(x => x.values.length);
-    const st = gs.length > 1 ? statsFor(gs.map((x, i) => ({ name: series[i].name, color: series[i].color, values: x.values }))) : null;
+    const gs = series.map(s => ({ name: s.name, values: s.bins[b].values })).filter(x => x.values.length);
+    const st = gs.length > 1 ? statsFor(gs) : null;
     if (st) statRows.push({ b, p: st.primaryP, name: st.primaryName });
     series.forEach(s => rowsT.push([s.name, +(b * bin).toFixed(4), +((b + 1) * bin).toFixed(4), s.bins[b].n, s.bins[b].mean, s.bins[b].sem]));
   }
@@ -4227,6 +4344,94 @@ function renderSrcTable(A) {
   host.appendChild(el('div', { class: 'note', id: 'srcNote', html: noteHtml }));
 }
 
+function bearingSeries(cd, reps) {
+  const fits = reps.map(r => r.fit).filter(f => isFinite(f.slope));
+  const slope = S.mean(fits.map(f => f.slope)), intercept = S.mean(fits.map(f => f.intercept));
+  const bins = reps[0].bins.map(({ x0, x1, mid }, k) => {
+    const values = reps.map(r => r.bins[k].mean).filter(Number.isFinite);
+    return { x0, x1, mid, n: values.length, mean: S.mean(values), sem: S.sem(values),
+      ci: S.meanCI(values), fitted: values.length ? intercept + slope * mid : NaN };
+  });
+  const fitted = bins.filter(b => isFinite(b.fitted));
+  const fitLine = fitted.length > 1 ? [fitted[0], fitted.at(-1)].map(b => [b.mid, b.fitted]) : [];
+  return { id: cd.id, name: cd.name, color: cd.color, bins, fitLine,
+    values: fits.map(f => f.slope), dash: cd.grad === 'no' ? '5,4' : null };
+}
+
+function bearingBinComparisons(groups) {
+  if (groups.length < 2) return '<p class="note">Add a second condition with bearing data to compare bins.</p>';
+  const tests = [];
+  groups.forEach(({ cd: a, plates: pa }, i) => {
+    for (const { cd: b, plates: pb } of groups.slice(i + 1)) {
+      pa[0].bins.forEach(({ x0, x1 }, k) => {
+        const va = pa.map(p => p.bins[k].mean).filter(Number.isFinite);
+        const vb = pb.map(p => p.bins[k].mean).filter(Number.isFinite);
+        const result = S.welch(va, vb);
+        tests.push({ a: a.name, b: b.name, x0, x1, na: va.length, nb: vb.length,
+          difference: S.mean(va) - S.mean(vb), lower: result?.lower, upper: result?.upper, p: result?.p });
+      });
+    }
+  });
+  S.holm(tests);
+  const header = ['Condition A', 'Condition B', 'cos θ from', 'cos θ to', 'Plates A', 'Plates B',
+    'Mean difference (A − B)', '95% CI lower', '95% CI upper', 'Welch p', 'Holm p'];
+  const rows = tests.map(t => [t.a, t.b, t.x0, t.x1, t.na, t.nb, t.difference, t.lower, t.upper, t.p, t.padj]);
+  const key = 'bearing_bin_comparisons';
+  const table = tableHTML(key, key, header, rows);
+  return '<details style="margin-top:12px"><summary>Exploratory comparisons by bearing bin</summary>' +
+    '<p class="note">Two-sided Welch tests on independent plate rates. Holm correction covers all calculable bin and condition-pair tests in this table. The intervals are pointwise 95% confidence intervals.</p>' +
+    '<div class="scroll">' + table + '</div></details>';
+}
+
+function renderBearing(withNav, c, grid, panel) {
+  const rateCfg = bearingRateConfig(c);
+  const ylab = rateLabel(rateCfg);
+  const byPlate = c.nUnit === 'file';
+  const groups = withNav.map(({ cd, ws }) => {
+    const worms = ws.filter(w => c.primary !== 'C' || w.hasCL);
+    return { cd, worms, plates: plateBearingRates(worms, rateCfg) };
+  }).filter(g => g.plates.length);
+  if (!groups.length) {
+    grid.appendChild(el('div', { class: 'empty' }, 'No eligible tracks for the selected reorientation method.'));
+    return '';
+  }
+  const series = groups.map(({ cd, worms, plates }) => bearingSeries(cd,
+    byPlate ? plates : worms.map(w => ({ bins: w.nav.rateBins, fit: w.nav.fit }))));
+  const binRows = [['Condition', 'Plate file', 'Plate ID', 'cos θ from', 'cos θ to', 'Bin center',
+    'Reorientation starts', `Valid heading time (${c.tUnit} summed across worms)`, ylab]];
+  const slopeRows = [['Condition', 'Plate file', 'Plate ID', 'Worms analyzed', 'Bins fitted',
+    `Slope (${ylab} per unit cos θ)`, `Intercept (${ylab})`, 'R²']];
+  groups.forEach(({ cd, plates }) => plates.forEach(p => {
+    p.bins.forEach(b => binRows.push([cd.name, p.file, p.fileId, b.x0, b.x1, b.mid, b.n, b.time, b.mean]));
+    slopeRows.push([cd.name, p.file, p.fileId, p.wormCount, p.fit.n, p.fit.slope, p.fit.intercept, p.fit.r2]);
+  }));
+  const binCSV = { name: 'bearing_plate_bins', rows: binRows };
+  const slopeCSV = { name: 'bearing_plate_slopes', rows: slopeRows };
+  ST.tables[binCSV.name] = binCSV;
+  ST.tables[slopeCSV.name] = slopeCSV;
+  ST.tables.bearing_bins = { name: 'bearing_bins', rows: [
+    ['Condition', 'cos θ from', 'cos θ to', 'n', 'Mean rate', 'SEM', '95% CI lower', '95% CI upper', 'Fitted rate'],
+    ...series.flatMap(s => s.bins.map(b => [s.name, b.x0, b.x1, b.n, b.mean, b.sem, b.mean - b.ci, b.mean + b.ci, b.fitted]))
+  ] };
+  const unit = byPlate ? 'plate' : 'worm';
+  const caption = byPlate
+    ? 'Per plate and bin, reorientation starts are divided by total valid heading time across worms.'
+    : 'Per worm and bin, reorientation starts are divided by valid heading time.';
+  grid.appendChild(figCard('bearing_turn_rate',
+    timeCourseFig('Reorientation rate vs bearing to the source', series, 'bearing to source, cos θ (+1 = toward the source)', ylab, 'fit', null),
+    `${caption} Points show mean ± pointwise 95% CI across ${unit}s. Dashed lines average the fitted ${unit} regressions.`,
+    { wide: wideFromSeries('bearing_turn_rate', series, 'cos theta', true), csv: binCSV, csvLabel: 'Plate bins CSV' }));
+  const slopeGroups = series.filter(s => s.values.length);
+  if (slopeGroups.length) {
+    panel('bearing_slope', 'Turn-rate vs bearing slope', null, `slope (${ylab} per unit cos θ)`,
+      `One least-squares slope per ${unit} with at least three eligible bins. Positive slopes mean more reorientations while heading toward the source.`,
+      { groups: slopeGroups, platePoints: byPlate, csv: slopeCSV, csvLabel: 'Plate slopes CSV' });
+  } else {
+    grid.appendChild(el('div', { class: 'empty' }, `A slope requires at least three eligible bearing bins per ${unit}.`));
+  }
+  return c.navBinTests ? bearingBinComparisons(groups) : '';
+}
+
 function renderNav(A) {
   const c = A.c, host = $('navFigs'), statHost = $('navStats'), tabHost = $('navTable');
   renderSrcTable(A);
@@ -4238,12 +4443,16 @@ function renderNav(A) {
   const grid = el('div', { class: 'figgrid' });
   const blocks = [], zeroRows = [];
   const noGradIds = new Set(ST.conds.filter(cd => cd.grad === 'no').map(cd => cd.id));
-  const panel = (key, title, field, ylab, caption) => {
-    const groups = replicates(field); if (!groups.length) return;
+  const panel = (key, title, field, ylab, caption, opt = {}) => {
+    const groups = opt.groups || replicates(field); if (!groups.length) return;
     groups.forEach(g => { if (noGradIds.has(g.id)) g.note = 'no gradient'; });
-    const st = statsFor(groups);
-    grid.appendChild(figCard(key, dotFig(title, groups, ylab, st, { errBar: c.errBar, h: 300, bars: c.barsOn, yMode: c.yAxisMode }), caption, { wide: wideFromGroups(key, groups) }));
+    const st = statsFor(groups, opt.platePoints);
+    const bearingSlope = key === 'bearing_slope';
+    const plot = dotFig(title, groups, ylab, st, { errBar: c.errBar, h: 300, bars: !bearingSlope && c.barsOn,
+      yMode: c.yAxisMode, platePoints: opt.platePoints, referenceZero: bearingSlope });
+    grid.appendChild(figCard(key, plot, caption, { ...opt, wide: wideFromGroups(key, groups) }));
     blocks.push({ title, st });
+    registerPlateComparison(key, st);
     groups.forEach(g => { const t = S.oneSampleT(g.values), w = S.signedRank(g.values);
       zeroRows.push({ metric: title, name: g.name, noGrad: noGradIds.has(g.id), n: g.values.length,
         mean: S.mean(g.values), t: t ? t.t : NaN, p: t ? t.p : NaN, wp: w ? w.p : NaN }); });
@@ -4251,19 +4460,7 @@ function renderNav(A) {
       rows: [['Condition', 'Gradient', 'n', 'Mean', 'SD', 'SEM', 'Median'],
         ...groups.map(g => [g.name, noGradIds.has(g.id) ? 'no' : 'yes', g.values.length, S.mean(g.values), S.sd(g.values), S.sem(g.values), S.median(g.values)])] }; };
 
-  /* --- reorientation rate vs bearing (Kramer et al. 2026) --- */
-  const rateSeries = withNav.map(({ cd, ws }) => {
-    const nb = ws[0].nav.rateBins.length, bins = [];
-    for (let k = 0; k < nb; k++) { const v = ws.map(w => w.nav.rateBins[k].mean).filter(isFinite);
-      const b0 = ws[0].nav.rateBins[k];
-      bins.push({ x0: b0.x0, x1: b0.x1, mid: b0.mid, values: v, mean: S.mean(v), sem: S.sem(v), n: v.length }); }
-    return { name: cd.name, color: cd.color, bins, dash: cd.grad === 'no' ? '5,4' : null }; });
-  grid.appendChild(figCard('bearing_turn_rate',
-    timeCourseFig('Reorientation rate vs bearing to the source', rateSeries, 'bearing to source, cos θ  (+1 = heading at it)', rateLabel(c), 'line', null),
-    'Kramer et al. 2026: bearing is cos θ, the angle between the direction of travel and the direction to the odour. A downward slope means the animal suppresses turning while it is heading the right way — the biased random walk. Dashed lines are no-gradient controls and should be flat.',
-    { wide: wideFromSeries('bearing_turn_rate', rateSeries, 'cos theta') }));
-  panel('bearing_slope', 'Turn-rate vs bearing slope', r => r.navSlope, `slope (${rateLabel(c)} per unit cos θ)`,
-    'One regression slope per replicate. Negative = fewer reorientations when heading toward the source. Zero means no bias.');
+  const binComparisons = renderBearing(withNav, c, grid, panel);
 
   /* --- weathervaning --- */
   const wvSeries = withNav.map(({ cd, ws }) => {
@@ -4305,23 +4502,20 @@ function renderNav(A) {
   let zeroHtml = '';
   if (zeroRows.length) { S.holm(zeroRows);
     zeroHtml = '<h4 style="font-size:13px;margin:18px 0 8px">Is each condition different from zero?</h4>' +
-      '<div class="note">A navigation measure has a meaningful zero: no bias at all. This is the test that matters for a <b>no-gradient control</b> — it should sit at zero, while a gradient condition should not. One-sample t-test of the per-replicate values against 0, Holm-corrected across every row here; the signed-rank p is given alongside for when the values are skewed.</div>' +
+      '<div class="note">One-sample t-tests compare each condition with zero, with Holm correction across this table. The signed-rank p is shown alongside. Use the direct condition comparison to assess a difference between conditions.</div>' +
       '<table><thead><tr><th>Measure</th><th>Condition</th><th class="n">n</th><th class="n">mean</th><th class="n">t</th><th class="n">p</th><th class="n">p (Holm)</th><th class="n">signed-rank p</th><th></th></tr></thead><tbody>' +
-      zeroRows.map(r => `<tr><td>${r.metric}</td><td>${r.name}${r.noGrad ? ' <span class="tag">no gradient</span>' : ''}</td><td class="n">${r.n}</td><td class="n">${fmt(r.mean, 4)}</td><td class="n">${fmt(r.t, 2)}</td><td class="n">${fmtP(r.p)}</td><td class="n">${fmtP(r.padj)}</td><td class="n">${fmtP(r.wp)}</td><td>${stars(r.padj)}</td></tr>`).join('') +
+      zeroRows.map(r => `<tr><td>${r.metric}</td><td>${escXml(r.name)}${r.noGrad ? ' <span class="tag">no gradient</span>' : ''}</td><td class="n">${r.n}</td><td class="n">${fmt(r.mean, 4)}</td><td class="n">${fmt(r.t, 2)}</td><td class="n">${fmtP(r.p)}</td><td class="n">${fmtP(r.padj)}</td><td class="n">${fmtP(r.wp)}</td><td>${stars(r.padj)}</td></tr>`).join('') +
       '</tbody></table>';
     ST.tables['navigation_vs_zero'] = { name: 'navigation_vs_zero',
       rows: [['Measure', 'Condition', 'Gradient', 'n', 'Mean', 't', 'p', 'p (Holm)', 'Signed-rank p'],
         ...zeroRows.map(r => [r.metric, r.name, r.noGrad ? 'no' : 'yes', r.n, r.mean, r.t, r.p, r.padj, r.wp])] }; }
-  statHost.innerHTML = shufHtml + zeroHtml + blocks.map((b, i) =>
-    `<details ${i === 0 ? 'open' : ''} style="margin-top:12px;border-top:1px solid var(--line);padding-top:10px"><summary style="cursor:pointer;font-size:13px;font-weight:600;color:var(--ink-2)">${b.title}${b.st && isFinite(b.st.primaryP) ? ` — p = ${fmtP(b.st.primaryP)} ${stars(b.st.primaryP)}` : ''}</summary><div style="margin-top:10px">${statsHTML(b.st)}</div></details>`).join('');
+  statHost.innerHTML = blocks.map((b, i) =>
+    `<details ${i === 0 ? 'open' : ''} style="margin-top:12px;border-top:1px solid var(--line);padding-top:10px"><summary style="cursor:pointer;font-size:13px;font-weight:600;color:var(--ink-2)">${b.title}${b.st && isFinite(b.st.primaryP) ? ` — p = ${fmtP(b.st.primaryP)} ${stars(b.st.primaryP)}` : ''}</summary><div style="margin-top:10px">${statsHTML(b.st)}</div></details>`).join('') + binComparisons + shufHtml + zeroHtml;
 
   const rows = A.rows.filter(r => isFinite(r.navSlope) || isFinite(r.wvSlope))
     .map(r => [r.cond, r.noGrad ? 'no' : 'yes', r.file, r.worm, r.meanCos, r.navSlope, r.wvSlope, r.dBearing]);
   tabHost.innerHTML = tableHTML('navigation', 'navigation_metrics',
-    ['Condition', 'Gradient', 'File', 'Worm', 'Mean cos θ', 'Turn-rate slope', 'Weathervaning slope', 'Mean Δ cos θ per turn'], rows);
-  const bins = [];
-  rateSeries.forEach(s2 => s2.bins.forEach(b => bins.push([s2.name, b.x0, b.x1, b.n, b.mean, b.sem])));
-  ST.tables['bearing_bins'] = { name: 'bearing_bins', rows: [['Condition', 'cos θ from', 'cos θ to', 'n', 'Mean rate', 'SEM'], ...bins] };
+    ['Condition', 'Gradient', 'File', 'Worm', 'Mean cos θ', 'Worm turn-rate slope', 'Weathervaning slope', 'Mean Δ cos θ per turn'], rows);
   const wb = [];
   wvSeries.forEach(s2 => s2.bins.forEach(b => wb.push([s2.name, b.x0, b.x1, b.n, b.mean, b.sem])));
   ST.tables['weathervaning_bins'] = { name: 'weathervaning_bins', rows: [['Condition', 'β from (deg)', 'β to (deg)', 'n', 'Mean curving rate', 'SEM'], ...wb] };
@@ -5375,14 +5569,15 @@ function renderMethods() {
 <h3>Navigation relative to a gradient</h3>
 <p>These analyses need to know where the cue is. With a point source, the <b>bearing</b> follows Kramer et al. (2026): θ is the angle between the animal's direction of movement and the direction to the source, and the bearing is reported as <b>cos θ</b>, so +1 is heading straight at the source and −1 straight away from it. With a linear gradient you can instead give a fixed direction and the same definition applies to that axis.</p>
 <h4>Turn rate versus bearing — the biased random walk</h4>
-<p>Time is accumulated into ${c.navBins} equal bins of cos θ, and each reorientation is assigned to the bin its bearing occupied in the sample before the turn began. Rate is events ÷ time within a bin, so bins the animal rarely occupied are not over-counted. A worm performing a biased random walk turns <i>less</i> when it is already heading up-gradient, so the curve slopes downward. Each replicate also gets a least-squares slope of rate on cos θ, and it is those slopes that are compared across conditions — the same logic as comparing regression slopes between groups. A slope indistinguishable from zero means no directional bias in turning, whatever the overall turn rate is.</p>
+<p>The app assigns each reorientation start to one of ${c.navBins} equal cos θ bins using the heading immediately before the turn. In <b>Plate / file</b> mode, the rate in each bin is the sum of starts divided by the sum of time with a valid heading across all worms on that plate. Bins with zero exposure are missing. Bins with exposure and zero starts have rate zero. When the global rate unit is per track, this panel still divides by time and displays ${rateLabel(bearingRateConfig(c))}.</p>
+<p>Each plate contributes one least-squares slope across its bin centers when at least three bins have exposure. A positive slope means reorientations increase while heading toward the source. The curve shows the mean rate and a pointwise 95% t confidence interval across plates at each bin. Dashed lines average the fitted plate regressions. The slope comparison tests the difference between conditions. The optional exploratory bin tests compare plate rates with Holm correction across testable bins and condition pairs.</p>
 <h4>Weathervaning — gradual steering</h4>
 <p>The second navigation mechanism (Iino &amp; Yoshida 2009) is a slow curve rather than a turn. Using only samples <i>outside</i> detected reorientations, the signed curving rate is plotted against the signed bearing β, where β is the angle you would have to turn (counter-clockwise positive) to face the source. If the animal steers toward the cue, the curving rate rises with β — it turns left when the source is to its left — so the slope through the origin is positive. Restricting the analysis to |β| below some limit avoids mixing in the geometry of animals pointing almost backwards.</p>
 <h4>Are the reorientations aimed?</h4>
 <p>For each turn, the bearing just before and just after is recorded, and their difference in cos θ says whether the animal came out better aimed. The null is built by <b>rigidly rotating the direction of the odour</b> ${fmt(c.shuffleN)} times: every turn the animal actually made is preserved and only the geometry is randomised, so a positive result cannot be produced by large turns alone. Reported per animal as a z-score and an empirical p-value against that null.</p>
 <h4>The no-gradient control</h4>
 <p>A slope, a curving-rate relationship or a change in bearing is only interpretable against a condition where there was nothing to navigate towards. Conditions marked <b>No gradient</b> are therefore not skipped: they go through exactly the same pipeline, using the position the cue would have occupied on those plates, so the assay geometry, the plate edges, any lighting asymmetry and any bias in the tracker itself all enter the control the same way they enter the test. If no position was marked for such a condition, each animal is instead assigned a random reference direction, which is the stricter null but discards the geometry.</p>
-<p>Two things then follow. Every navigation measure has a meaningful zero, so each condition is additionally tested against zero with a one-sample t-test (and a Wilcoxon signed-rank test alongside, for skewed values), Holm-corrected across the whole table. A convincing result is a gradient condition significantly different from zero <i>and</i> a no-gradient condition that is not — which is a stronger claim than the two conditions merely differing from each other. No-gradient conditions are drawn with dashed lines in the binned plots and labelled under their column in the summary plots, so a reader can see at a glance which is which.</p>
+<p>Each condition is also tested against zero with a one-sample t-test, with Holm correction across the table. A signed-rank p-value is shown alongside. Use the direct condition comparison to assess how much the gradient and no-gradient slopes differ. No-gradient conditions are identified in the plot legend and under their slope points.</p>
 <p>Two caveats. The rotation treats the source as effectively distant, which is a good approximation while the animal is far from it and a poor one once it is on top of it. And the whole section is only meaningful if the source coordinates are right — mark them by clicking on the track panel and check that the crosshair lands where the spot actually was.</p>
 
 <h3>Roaming and dwelling</h3>
@@ -5401,12 +5596,12 @@ function renderMethods() {
 <p>The gradient map draws the same field under the tracks as filled iso-concentration bands with labelled contour rings. The shading is spaced evenly in log concentration by default, because a diffusion field falls off fast enough that a linear scale puts almost the whole plate in one band; a linear scale is available for comparison with the simulation notebook. The bands are real polygons, not an image, so the exported SVG and PDF stay fully editable.</p>
 
 <h3>Statistics</h3>
-<p>Each replicate contributes one value — by default one <b>${c.nUnit === 'file' ? 'plate' : 'worm'}</b>. Worms on the same plate are not fully independent (shared bacteria, temperature, handling), so if you have several plates per condition, switching the replicate unit to “plate” is the conservative choice, and the more defensible one for publication.</p>
+<p>The selected replicate unit is <b>${c.nUnit === 'file' ? 'plate' : 'worm'}</b>. Plate / file is the default because worms on one plate share the same assay conditions. The runs, total distance and overall reorientation plots average their worm summaries within a plate. The bearing slope is fitted to the plate’s pooled rates.</p>
 <ul>
-<li><b>Two conditions</b>: Welch's unpaired t-test (does not assume equal variances) and the Mann–Whitney U test are both reported.</li>
+<li><b>Two conditions</b>: The plate comparisons for bearing slopes, runs, total distance and overall reorientation use Welch's unpaired t-test with a 95% confidence interval for the mean difference. This assumes independent plates. Other two-condition panels report Welch's t-test and Mann–Whitney U.</li>
 <li><b>Three or more conditions</b>: one-way ANOVA with pairwise Welch t-tests, and the Kruskal–Wallis test with Dunn's post hoc. All post hoc p-values carry a Holm–Bonferroni correction, which controls the family-wise error rate and is uniformly more powerful than plain Bonferroni.</li>
 </ul>
-<p>A D'Agostino K² screen for skew and kurtosis decides which family is reported as primary; it is advisory, not a gate. Count data such as reorientation number are frequently over-dispersed and right-skewed, so the non-parametric result is often the one that should be quoted. Asterisks on the plots follow the usual convention (* p&lt;0.05, ** p&lt;0.01, *** p&lt;0.001, **** p&lt;0.0001) and, for three or more groups, are the Holm-adjusted values.</p>
+<p>Where both families of tests are reported, a D'Agostino K² screen for skew and kurtosis selects the primary result when enough replicates are available. Asterisks on the plots follow the usual convention (* p&lt;0.05, ** p&lt;0.01, *** p&lt;0.001, **** p&lt;0.0001). For three or more groups, they denote Holm-adjusted values.</p>
 
 <h3>What this analysis cannot tell you</h3>
 <ul>
@@ -5481,7 +5676,7 @@ function renderGuide() {
 <p><b>Import &amp; export</b> — out: every table as a spreadsheet file, every figure as SVG, PNG or PDF, and one archive holding the lot. In: a project archive or a settings file from a previous session, which brings all your choices back.</p>
 
 <h3>5 · How to read the plots</h3>
-<p>Most comparison plots look the same. The <b>bar</b> is the average of the group. The <b>whiskers</b> show how uncertain that average is (by default the standard error of the mean — short whiskers mean the average is well pinned down). Every <b>dot</b> is one animal or one plate; they are spread sideways only so they do not sit on top of each other, and the sideways position means nothing.</p>
+<p>The horizontal line marks the group mean, and the default whiskers show its 95% t confidence interval. Bars are optional. In plate mode, larger dots on the runs, total distance and reorientation plots mark plate means and faint dots mark individual worms. The comparison uses one value per plate. The sideways position separates overlapping dots.</p>
 <p>The <b>asterisks</b> on the bracket are a shorthand for the p-value: <span class="mono">*</span> below 0.05, <span class="mono">**</span> below 0.01, <span class="mono">***</span> below 0.001, <span class="mono">****</span> below 0.0001, and <span class="mono">n.s.</span> for "not significant".</p>
 <p>A <b>p-value</b> answers one narrow question: <i>if the two groups were really identical, how often would chance alone produce a difference at least this big?</i> Small p means chance is an awkward explanation. It does <b>not</b> tell you the difference is large, or important, or real in a biological sense. Always look at the dots as well as the asterisks: three animals in one clump and one outlier can produce a small p-value that no one should believe.</p>
 
@@ -5497,7 +5692,7 @@ function renderGuide() {
 
 <h3>7 · The mistake that matters most: what counts as "n"</h3>
 <p>Twenty worms on one plate is not twenty independent measurements. They shared the same agar, the same bacteria, the same temperature, the same slightly-too-warm afternoon. If that plate was unusual, all twenty worms are unusual together, and a statistical test that treats them as independent will happily report a tiny p-value for a difference between two plates rather than between two genotypes.</p>
-<p>The fix is to run <b>several plates per condition</b> — three to five is usual — and set <i>Replicate unit</i> to <b>Plate / file</b> on the Analysis settings tab. Each plate then contributes one number. Your n drops and your p-values get bigger, and that is the point: they were too small before. If you only have one plate per condition, you can still explore the data, but treat every p-value as a hint about what to test properly, not as a finding.</p>
+<p>With <b>Plate / file</b> selected, each independently run plate contributes one number. Report how many plates contributed and show their individual values. With only a few plates, the size of the difference and the confidence interval convey how precisely it was estimated.</p>
 
 <h3>8 · Things that will trip you up</h3>
 <p><b>The frame rate is wrong.</b> Every threshold with a "per second" in it scales with the frame rate, so getting it wrong quietly ruins everything. Check it against the recording length: frames ÷ frame rate should equal the number of seconds you filmed for.</p>
