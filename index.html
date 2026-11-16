@@ -538,7 +538,7 @@ td.n,th.n{text-align:right;font-variant-numeric:tabular-nums;font-family:var(--m
     <div class="head">
       <h2>Salt gradient</h2>
       <p>A chemotaxis plate has no salt sensor in it, so the gradient has to be <b>modelled</b>. A drop of concentrated NaCl placed on the agar spreads by diffusion, and the concentration it leaves behind depends only on how much salt was in the drop, how long ago it was placed, how thick the agar is, and how far away you are from it. Set the plate and the drops here once and every salt analysis in the app — the response plots, the map, the exported numbers — follows from it.</p>
-      <p>The default model and its constants are the ones used in the lab's own simulation notebook, so the field you see here is the field you would get there. The exact formula, the code that runs it and a standalone Python copy are at the bottom of the <b>Methods</b> tab.</p>
+      <p>The default model treats the drop as spreading in two dimensions through a uniform agar layer. The formula and downloadable code are at the bottom of the <b>Methods</b> tab.</p>
     </div>
     <div class="card">
       <h3>Plate and agar</h3>
@@ -2026,12 +2026,12 @@ function linFit(x, y) {
 /* ============================================================================
    4d. salt gradient — a modelled chemical field, and what each animal experienced
    ----------------------------------------------------------------------------
-   The default is the point-bolus diffusion model used in the lab's own simulation
-   notebook: a drop of volume v (uL) of a c0 (mM) stock placed t seconds ago on agar
-   of height h (cm) leaves, at a distance r (cm) from the spot,
+   The default model assumes two-dimensional diffusion in an agar layer of uniform
+   height h (cm). A drop of volume v (uL) at stock concentration c0 (mM), placed t
+   seconds ago, contributes at a distance r (cm) from the spot
 
-       C(r) = 1e6 * N / sqrt(4 * pi * h * D * t) * exp(-r^2 / (4 * D * t))     [mM]
-       N    = (c0 / 1000) * (v / 1e6)                                          [mol]
+       C(r) = 1e6 * N / (4 * pi * h * D * t) * exp(-r^2 / (4 * D * t))         [mM]
+       N    = (c0 / 1000) * (v / 1e6)                                         [mol]
 
    with D = 1.516e-5 cm^2/s for NaCl (Robinson & Stokes 1951). Several drops simply
    add, on top of the salt already in the agar. Nothing here is fitted to the data.
@@ -2076,7 +2076,7 @@ function saltAt(r, sc, tAdd) {
   for (const d of sc.drops) {
     const t = d.t + (tAdd || 0); if (t <= 0) continue;
     const N = (sc.stock / 1000) * (d.vol / 1e6);
-    C += 1e6 * N / Math.sqrt(4 * Math.PI * h * D * t) * Math.exp(-(r * r) / (4 * D * t));
+    C += 1e6 * N / (4 * Math.PI * h * D * t) * Math.exp(-(r * r) / (4 * D * t));
   }
   return C;
 }
@@ -4607,16 +4607,20 @@ function renderSaltModel() {
     curveFig('Concentration along the plate centre line', [{ name: 'centre line', color: '#127a4a', pts: line }],
       'position along the centre line (mm)', 'C (mM)',
       [{ v: spotY, label: 'drop', color: '#d1495b' }, { v: d / 2, label: 'plate centre', color: '#8b93a1' }]),
-    'The same slice the simulation notebook plots, so the two can be compared directly.',
+    'A cross-section through the drop and the centre of the plate.',
     { wide: wideFromPts('salt_profile_centreline', [{ name: 'C (mM)', pts: line }], 'position along the centre line (mm)') }));
 
-  if (sc.drops.length > 1) {
-    const series = sc.drops.map((dr, i) => ({ name: `drop ${dr.n}: ${fmt(dr.vol, 3)} µL, ${fmt(dr.hours, 3)} h`,
-      color: PALETTE[i % PALETTE.length],
-      pts: Array.from({ length: 121 }, (_, k) => { const rmm = d / 2 * 1.2 * k / 120;
-        const N = (sc.stock / 1000) * (dr.vol / 1e6), t = dr.t;
-        return [rmm, 1e6 * N / Math.sqrt(4 * Math.PI * h * sc.D * t) * Math.exp(-Math.pow(rmm / 10, 2) / (4 * sc.D * t))]; }) }));
-    if (sc.model === 'drops') grid.appendChild(figCard('salt_profile_per_drop',
+  if (sc.model === 'drops' && sc.drops.length > 1) {
+    const series = sc.drops.map((dr, i) => {
+      const dropCfg = { ...sc, bg: 0, drops: [dr] };
+      const pts = Array.from({ length: 121 }, (_, k) => {
+        const rmm = d / 2 * 1.2 * k / 120;
+        return [rmm, saltAt(rmm / 10, dropCfg, 0)];
+      });
+      return { name: `drop ${dr.n}: ${fmt(dr.vol, 3)} µL, ${fmt(dr.hours, 3)} h`,
+        color: PALETTE[i % PALETTE.length], pts };
+    });
+    grid.appendChild(figCard('salt_profile_per_drop',
       curveFig('Contribution of each drop', series, 'distance from the drop (mm)', 'added C (mM)', []),
       'An old drop has spread wide and flat; a recent one is a narrow spike. The field the animal feels is the sum, plus the salt already in the agar.',
       { wide: wideFromPts('salt_profile_per_drop', series, 'distance from the drop (mm)', 'added C (mM)') }));
@@ -4963,7 +4967,7 @@ function renderGradMap(A) {
 }
 
 /* ---- the code behind the gradient, in the open ---- */
-const SALT_PY_NOTEBOOK = `# From the lab's marimo simulation notebook (the authoritative version).
+const SALT_PY_NOTEBOOK = `# Adapted from the lab's marimo simulation notebook for two-dimensional diffusion.
 
 # GLOBAL VARIABLES
 spacing = 1       # matrix resolution for calculation
@@ -5002,7 +5006,7 @@ def conc_mat(arr, drop_pos, drop_time, drop_conc=5000, h=0.4074):
     proc = (
         lambda x: 1e6
         * Nm1
-        / math.sqrt(4 * math.pi * h * Dc * (t1))
+        / (4 * math.pi * h * Dc * t1)
         * math.exp((-1 * x**2) / (4 * Dc * (t1)))
     )
     vecproc = np.vectorize(proc)
@@ -5038,7 +5042,7 @@ function saltStandalonePy(sc) {
   return [
     '"""Salt gradient model, exported from Worm Track Analyzer.',
     '',
-    'Point-bolus diffusion, after the lab simulation notebook.',
+    'Two-dimensional point-bolus diffusion in a uniform agar layer.',
     'D for NaCl from Robinson & Stokes (1951). Concentrations in mM, distances in cm.',
     'Generated ' + new Date().toISOString(),
     '"""',
@@ -5070,7 +5074,7 @@ function saltStandalonePy(sc) {
     '        c += (',
     '            1e6',
     '            * moles',
-    '            / math.sqrt(4 * math.pi * AGAR_HEIGHT_CM * D_NACL * t)',
+    '            / (4 * math.pi * AGAR_HEIGHT_CM * D_NACL * t)',
     '            * math.exp(-(r_cm ** 2) / (4 * D_NACL * t))',
     '        )',
     '    return c',
@@ -5093,7 +5097,7 @@ function renderSaltCode() {
   host.innerHTML = `
     <div>
       <h3 style="font-size:13px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-3);margin-bottom:12px">The salt gradient, in code</h3>
-      <div class="eq">C(r) = C_background + Σ_drops  1e6 · N / √(4·π·h·D·t) · exp( −r² / (4·D·t) )
+      <div class="eq">C(r) = C_background + Σ_drops  1e6 · N / (4·π·h·D·t) · exp( −r² / (4·D·t) )
 
   N = (stock_mM / 1000) · (volume_µL / 1e6)      moles of NaCl in the drop
   h = agar_volume_mL / (π · (plate_radius_mm)²) · 100     agar height, cm
@@ -5107,16 +5111,16 @@ function renderSaltCode() {
       <div class="row" style="margin-top:12px">
         <button class="btn pri" id="saltPyBtn">Download the model as Python</button>
         <button class="btn" id="saltJsBtn">Download the JavaScript</button>
-        <button class="btn" id="saltNbBtn">Download the notebook Python</button>
+        <button class="btn" id="saltNbBtn">Download the corrected notebook excerpt</button>
         <button class="btn" id="saltCopyBtn">Copy the JavaScript</button>
       </div>
-      <div class="note">The Python file has your current parameters written into it and reproduces the numbers above exactly — useful as a check, and as the thing to cite or deposit when you publish.</div>
+      <div class="note">The standalone Python file reproduces the diffusing-drop model with your current plate and drop settings.</div>
       <details style="margin-top:10px"><summary style="cursor:pointer;font-size:13px;font-weight:600;color:var(--ink-2)">Read the code here instead</summary>
         <h4 style="font-size:12.5px;margin:14px 0 4px">The JavaScript this app just ran</h4>
         <div class="note" style="margin-top:0">Read straight out of the running functions, so it cannot drift from what produced your figures.</div>
         <pre class="code">${escXml(js)}</pre>
-        <h4 style="font-size:12.5px;margin:16px 0 4px">The Python it was built to match</h4>
-        <div class="note" style="margin-top:0">The lab's simulation notebook. Note the normalisation √(4πhDt) — the app uses the same one, deliberately, so the two agree digit for digit.</div>
+        <h4 style="font-size:12.5px;margin:16px 0 4px">Corrected excerpt from the lab's simulation notebook</h4>
+        <div class="note" style="margin-top:0">The excerpt and the app both use the two-dimensional denominator 4πhDt.</div>
         <pre class="code">${escXml(SALT_PY_NOTEBOOK)}</pre>
         <h4 style="font-size:12.5px;margin:16px 0 4px">Standalone Python, with your current settings baked in</h4>
         <pre class="code">${escXml(saltStandalonePy(sc))}</pre>
@@ -5373,6 +5377,7 @@ $('zipAll').onclick = async () => {
       `  replicate unit        ${c.nUnit === 'file' ? 'plate / file' : 'individual worm'}`,
       `  gradient geometry     ${c.navMode}`,
       `  salt model            ${sc.model === 'drops' ? 'diffusing drops (point bolus)' : sc.model === 'gauss' ? 'single Gaussian' : sc.model === 'exp' ? 'exponential decay' : 'linear ramp'}`,
+      sc.model === 'drops' ? '  salt denominator      4*pi*h*D*t (two-dimensional diffusion)' : null,
       sc.model === 'drops' ? `  salt drops            ${sc.drops.map(d => `${d.vol} uL at ${d.hours} h`).join(', ') || 'none'}; stock ${sc.stock} mM, background ${sc.bg} mM` : null,
       sc.model === 'drops' ? `  agar height           ${fmt(agarHeight(sc), 4)} cm (${sc.agarVol} mL in a ${sc.plateDia} mm plate), D = ${sc.D} cm^2/s` : null,
       `  salt peak at spot     ${fmt(saltPeakC(sc, 0), 4)} mM`,
@@ -5589,8 +5594,8 @@ function renderMethods() {
 <p>The exponent α is fitted over the first half of the lag range, where there are the most independent samples; lags beyond ${fmt(c.msdMaxFrac * 100)}% of a track are not computed at all because they average over too few starting points to be stable. The effective diffusion coefficient is MSD ÷ 4τ at the reference lag, in two dimensions. Because overlapping time windows are used, neighbouring points on an MSD curve are correlated — read the shape, and do the statistics on the per-animal α and D rather than on the curve.</p>
 
 <h3>The salt gradient, and responses to it</h3>
-<p>A chemotaxis plate carries no sensor, so the stimulus has to be modelled. A drop of volume <i>v</i> of a <i>c</i>&#8203;<sub>0</sub> stock placed on the agar <i>t</i> seconds ago is treated as a point bolus diffusing in a thin layer, which gives, at a distance <i>r</i> from the spot, C(r) = 10<sup>6</sup>·N / &#8730;(4&#960;hD t) · exp(&#8722;r&#178;/4D t), with N = (c<sub>0</sub>/1000)·(v/10<sup>6</sup>) moles, <i>h</i> the agar height in cm computed from the volume poured and the area of the plate, and D = 1.516&#215;10<sup>&#8722;5</sup> cm&#178;&#183;s<sup>&#8722;1</sup> for NaCl (Robinson &amp; Stokes 1951). Several drops add linearly on top of the salt already in the agar. Nothing in this expression is fitted to the behavioural data, and the full source — including a standalone Python copy with your own numbers in it — is in the box below, so it can be checked independently.</p>
-<p>Three caveats are worth stating in a methods section. The model assumes a laterally infinite, uniformly thick layer, so it is wrong within a few millimetres of the rim and wrong if the plate was poured unevenly. It assumes the drop was absorbed instantly at a point, which is a good approximation once the drop is hours old and a poor one in the first minutes. And it uses the normalisation of the source notebook, &#8730;(4&#960;hD t); any constant error in that normalisation scales every concentration by the same factor, which shifts the axis of the response plots but leaves the sign and the significance of every slope untouched.</p>
+<p>A drop of volume <i>v</i> at stock concentration <i>c</i><sub>0</sub> diffuses laterally in a thin agar layer. At a distance <i>r</i> from the spot and age <i>t</i>, its contribution is C(r) = 10<sup>6</sup>·N / (4&#960;hDt) · exp(&#8722;r&#178;/(4Dt)), with N = (c<sub>0</sub>/1000)·(v/10<sup>6</sup>) moles, <i>h</i> the agar height in cm, and D = 1.516&#215;10<sup>&#8722;5</sup> cm&#178;&#183;s<sup>&#8722;1</sup> for NaCl (Robinson &amp; Stokes 1951). The model adds each drop's contribution to the background concentration.</p>
+<p>The model assumes a laterally infinite, uniformly thick agar layer and instantaneous absorption at a point. Its approximation is weaker near the plate rim, on uneven agar, and shortly after dispensing a drop.</p>
 <p>Each animal is then put through its own modelled field. At every sample the distance to the spot gives a concentration C; from that follow the change since the previous sample, the change across an adjustable look-back window (&#916;C), the instantaneous rate of change dC/dt, and the change expressed as a percentage of the previous concentration. Reorientation rate against each of these is computed the same way the bearing analysis is computed: the recording is divided into bins of the salt variable, the time each animal spent in each bin and the number of reorientations that began there are counted separately per animal, and the rate is a count divided by a time rather than an average of ratios. Bin edges are built from every condition pooled, so panels are directly comparable, and are either equal in width across a trimmed central range or equal in count, switchable. A straight line fitted across the bins gives one slope per replicate; those slopes are compared between conditions and tested against zero.</p>
 <p>A negative slope against &#916;C or dC/dt is the signature of klinokinesis: fewer reorientations while the salt is rising, more while it is falling, which biases an otherwise random walk up the gradient. The percentage-change plot is the Weber-scaled version of the same measure, and is the better one if the animals respond to relative rather than absolute change. Conditions marked <b>No gradient</b> are run through identical code against the position the spot would have occupied; their slopes should sit at zero, and a result in which the gradient condition differs from zero while the control does not is a far stronger claim than the two conditions merely differing from each other.</p>
 <p>The gradient map draws the same field under the tracks as filled iso-concentration bands with labelled contour rings. The shading is spaced evenly in log concentration by default, because a diffusion field falls off fast enough that a linear scale puts almost the whole plate in one band; a linear scale is available for comparison with the simulation notebook. The bands are real polygons, not an image, so the exported SVG and PDF stay fully editable.</p>

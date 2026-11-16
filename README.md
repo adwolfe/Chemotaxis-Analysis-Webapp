@@ -85,10 +85,10 @@ and the control does not", which is stronger than the two merely differing.
 
 ## The salt gradient model
 
-The field is modelled as a point bolus diffusing in a thin agar layer:
+The field is modelled as two-dimensional diffusion of a point bolus in a uniform agar layer.
 
 ```
-C(r) = C_background + Σ_drops  1e6 · N / √(4·π·h·D·t) · exp( −r² / (4·D·t) )
+C(r) = C_background + Σ_drops  1e6 · N / (4·π·h·D·t) · exp( −r² / (4·D·t) )
 
 N = (stock_mM / 1000) · (volume_µL / 1e6)              moles of NaCl in the drop
 h = agar_volume_mL / (π · plate_radius_mm²) · 100      agar height, cm
