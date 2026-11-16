@@ -15,16 +15,18 @@ step; it runs entirely in the browser, works offline, and your data never leaves
 ## Quick start
 
 1. Open the link above, or download `index.html` and double-click it.
-2. On the **Tracks** tab, drag your CSV or `.xlsx` files onto the drop zone — one file per plate.
-3. On **Data & groups**, add a second condition and drop its files in.
-4. On **Analysis settings**, set the **frame rate** (fps) and the **scale** (pixels per mm). Without
-   them the app still works, but time is counted in frames and distance in pixels.
-5. Go back to **Tracks** and move the threshold sliders until the marks land on the turns you can
-   actually see. That calibration step is the analysis; everything downstream follows from it.
+2. In **Data & groups**, create each condition and add its CSV or Excel recordings.
+3. Enter the frame rate, scale, and each recording’s goal and plate centre on the same tab.
+4. Open **Tracks** and adjust the turn thresholds until the marks line up with the turns
+   you can see.
 
 There is a **Load demo data** button if you want to see the whole thing working before you commit
 your own files, and a **Guide for beginners** tab written for someone meeting worm tracking for the
 first time.
+
+When recorded scales span at most 5 pixels/mm, the app averages their pixel sizes in µm/pixel
+and converts the mean into one scale for all conditions. A manually entered scale overrides
+automatic averaging.
 
 ---
 
@@ -101,9 +103,14 @@ selectable so a result can be shown not to depend on the shape of the model. The
 prints the formula, the live JavaScript, and a standalone Python file with your own parameters baked
 in — download it and check the numbers independently.
 
-For a circular track figure, select **Gradient map → Map extent → Full plate** and enter the plate
-centre in the tracking coordinate system, in pixels. The diameter comes from **Salt gradient**.
-**Track region** zooms in on the recorded paths and the source.
+Enter each recording’s goal and plate centre in **Data & groups**, in original video pixels.
+Excel files with a `start-end coords` sheet fill the recording start and salt peak automatically.
+The **Mark on plot** control edits one recording at a time. Tracks align to the recording start
+when available and otherwise to each worm’s first position. Whole-plate maps align recording centres
+using the diameter under **Salt gradient**.
+The rotation setting puts each goal on the left of the x-axis. Overlay shading uses the mean
+goal and open circles show individual goals. Salt and bearing calculations use the original
+recording coordinates.
 
 Two things worth knowing before quoting salt results: ΔC and dC/dt are *differences*, so the assumed
 background concentration cancels exactly, while the percentage-change axis divides by concentration

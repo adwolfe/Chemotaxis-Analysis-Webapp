@@ -147,17 +147,17 @@ td.n,th.n{text-align:right;font-variant-numeric:tabular-nums;font-family:var(--m
       <p>Turns · speed · navigation · salt</p>
     </div>
     <nav class="nav" id="nav">
-      <button data-tab="tracks" class="on"><span class="num">1</span> Tracks</button>
-      <button data-tab="reo"><span class="num">2</span> Reorientations</button>
-      <button data-tab="speed"><span class="num">3</span> Speed &amp; distance</button>
-      <button data-tab="iri"><span class="num">4</span> Runs</button>
-      <button data-tab="nav"><span class="num">5</span> Navigation</button>
-      <button data-tab="roam"><span class="num">6</span> Roaming &amp; dwelling</button>
-      <button data-tab="time"><span class="num">7</span> Time course</button>
-      <button data-tab="salt"><span class="num">8</span> Salt gradient</button>
-      <button data-tab="saltresp"><span class="num">9</span> Salt response</button>
-      <button data-tab="gradmap"><span class="num">10</span> Gradient map</button>
-      <button data-tab="data"><span class="num">11</span> Data &amp; groups</button>
+      <button data-tab="data" class="on"><span class="num">1</span> Data &amp; groups</button>
+      <button data-tab="tracks"><span class="num">2</span> Tracks</button>
+      <button data-tab="reo"><span class="num">3</span> Reorientations</button>
+      <button data-tab="speed"><span class="num">4</span> Speed &amp; distance</button>
+      <button data-tab="iri"><span class="num">5</span> Runs</button>
+      <button data-tab="nav"><span class="num">6</span> Navigation</button>
+      <button data-tab="roam"><span class="num">7</span> Roaming &amp; dwelling</button>
+      <button data-tab="time"><span class="num">8</span> Time course</button>
+      <button data-tab="salt"><span class="num">9</span> Salt gradient</button>
+      <button data-tab="saltresp"><span class="num">10</span> Salt response</button>
+      <button data-tab="gradmap"><span class="num">11</span> Gradient map</button>
       <button data-tab="params"><span class="num">12</span> Analysis settings</button>
       <button data-tab="methods"><span class="num">13</span> Methods</button>
       <button data-tab="export"><span class="num">14</span> Import &amp; export</button>
@@ -172,7 +172,96 @@ td.n,th.n{text-align:right;font-variant-numeric:tabular-nums;font-family:var(--m
   <main class="main">
 
   <!-- ============ TRACKS (landing) ============ -->
-  <section class="tab on" id="tab-tracks">
+  <!-- ============ DATA ============ -->
+  <section class="tab on" id="tab-data">
+    <div class="head">
+      <h2>Data &amp; groups</h2>
+      <p>One condition per experimental group; one file per plate or replicate. <b>CSV</b> and <b>Excel</b> (<span class="mono">.xlsx</span>) track files both work. Required columns: <span class="mono">WormID, Frame, PositionX, PositionY</span> (<span class="mono">Quality</span> optional). In an Excel workbook these are read from the <span class="mono">Tracks</span> sheet; a <span class="mono">Parameters</span> sheet sets the frame rate and scale automatically, and a <span class="mono">Centerlines</span> sheet unlocks posture-based turn detection. Dropping a whole folder also picks up <span class="mono">worm_summary.json</span> for calibration.</p>
+    </div>
+
+    <div class="card">
+      <h3>Calibration</h3>
+      <div class="grid g3">
+        <div>
+          <label class="f">Frame rate <span class="hint">frames / s</span></label>
+          <input type="number" id="fps" placeholder="leave blank → use frames" step="any" min="0">
+        </div>
+        <div>
+          <label class="f">Spatial scale <span class="hint">pixels / mm</span></label>
+          <input type="number" id="pxmm" placeholder="automatic when available" step="any" min="0">
+          <button class="btn sm" id="autoScaleBtn" type="button">Use automatic scale</button>
+        </div>
+        <div>
+          <label class="f">Rate units for plots</label>
+          <select id="rateUnit">
+            <option value="min">reorientations / minute</option>
+            <option value="sec">reorientations / second</option>
+            <option value="track">reorientations / track (total)</option>
+          </select>
+        </div>
+      </div>
+      <div class="note" id="unitNote"></div>
+      <div class="note" id="scaleNote"></div>
+    </div>
+
+    <div class="card">
+      <h3>Conditions</h3>
+      <div id="conds"></div>
+      <div class="row" style="margin-top:10px">
+        <button class="btn pri" id="addCond">+ Add condition</button>
+        <button class="btn sm" id="demoBtn">Load example data</button>
+        <button class="btn sm danger" id="clearAll">Clear everything</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Quality control</h3>
+      <div class="grid g2">
+        <div>
+          <label class="f">Include tracker <span class="mono">Quality</span> codes</label>
+          <div class="row" id="qualBoxes"></div>
+          <div style="font-size:11px;color:var(--ink-3);margin-top:6px">Codes present in your files appear here. In WormLab-style output <span class="mono">3</span> usually marks a lost track (position 0,0) and is excluded by default.</div>
+        </div>
+        <div class="grid" style="gap:10px">
+          <div>
+            <label class="f">Reject jumps larger than <span class="hint">px / frame · 0 = off</span></label>
+            <input type="number" id="maxStep" value="25" step="any" min="0">
+          </div>
+          <div>
+            <label class="f">Minimum track length <span class="hint">frames</span></label>
+            <input type="number" id="minFrames" value="100" step="1" min="0">
+          </div>
+          <div>
+            <label class="f">Exclude near-stationary worms <span class="hint">min. path length, px · 0 = off</span></label>
+            <input type="number" id="minPath" value="200" step="any" min="0">
+          </div>
+          <label class="chk"><input type="checkbox" id="dropZero" checked> Drop rows at exactly (0, 0)</label>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Loaded data</h3>
+      <div id="dataSummary"><div class="empty">No files loaded yet.</div></div>
+    </div>
+    <div class="card">
+      <h3>Recording landmarks</h3>
+      <div class="row">
+        <label class="chk"><input type="checkbox" id="alignCue" checked> Rotate each recording so the goal lies to the left on the x-axis</label>
+      </div>
+      <div class="note">Excel files with a start-end coords sheet fill in the start and goal automatically. Coordinates are in original video pixels. Rotation uses the line from the start to the goal, or the plate centre when a start is unavailable.</div>
+      <div class="scroll" id="srcTable"></div>
+      <div id="landmarkPicker"></div>
+      <details style="margin-top:10px"><summary>Shared centre for recordings without a centre</summary>
+        <div class="row" style="margin-top:8px">
+          <label>Centre x (px) <input type="number" id="saltCx" step="any" style="width:110px"></label>
+          <label>Centre y (px) <input type="number" id="saltCy" step="any" style="width:110px"></label>
+        </div>
+      </details>
+    </div>
+  </section>
+
+  <section class="tab" id="tab-tracks">
 
     <div id="startCard">
       <div class="head">
@@ -342,7 +431,7 @@ td.n,th.n{text-align:right;font-variant-numeric:tabular-nums;font-family:var(--m
             <label class="chk"><input type="checkbox" id="axAuto" checked> Auto range (pooled over all conditions)</label>
             <label class="chk"><input type="checkbox" id="axEqual" checked> Equal aspect ratio</label>
             <label class="chk"><input type="checkbox" id="axFlipY" checked> Flip Y (image coordinates)</label>
-            <label class="chk"><input type="checkbox" id="axOrigin"> Align all tracks to a common start point</label>
+            <label class="chk"><input type="checkbox" id="axOrigin" checked> Align tracks to the recording start point or each worm’s first position</label>
           </div>
           <div class="grid g4">
             <div><label class="f">X min</label><input type="number" id="axXmin" step="any" disabled></div>
@@ -436,8 +525,8 @@ td.n,th.n{text-align:right;font-variant-numeric:tabular-nums;font-family:var(--m
   <section class="tab" id="tab-nav">
     <div class="head">
       <h2>Navigation</h2>
-      <p>Is the animal steering with respect to a gradient, or just moving? These analyses need to know where the odour (or other cue) is. Mark the source below, or switch to <b>Set source by clicking</b> on the Tracks tab and click the spot on a panel.</p>
-      <p>Conditions run <b>without</b> a gradient are the control, and they belong in the same analysis: set them to <i>No gradient</i> below and every measure is computed for them in exactly the same way, against the position where the cue would have been. Their slopes should sit at zero, which is what makes a non-zero slope elsewhere believable.</p>
+      <p>Is the animal steering with respect to a gradient, or just moving? These analyses need to know where the odour (or other cue) is. Set the goal location for each recording in <b>Data &amp; groups</b>.</p>
+      <p>Conditions run <b>without</b> a gradient are the control, and they belong in the same analysis: set them to <i>No gradient</i> in Data &amp; groups and every measure is computed for them in exactly the same way, against the position where the cue would have been. Their slopes should sit at zero, which is what makes a non-zero slope elsewhere believable.</p>
     </div>
     <div class="card">
       <h3>Gradient geometry</h3>
@@ -461,7 +550,6 @@ td.n,th.n{text-align:right;font-variant-numeric:tabular-nums;font-family:var(--m
             <option value="random">A random direction per worm</option>
           </select></div>
       </div>
-      <div id="srcTable" style="margin-top:12px"></div>
     </div>
     <div class="card">
       <h3>Weathervaning</h3>
@@ -606,7 +694,7 @@ td.n,th.n{text-align:right;font-variant-numeric:tabular-nums;font-family:var(--m
     <div class="card">
       <h3>Where the drop is, on the plate</h3>
       <div class="row">
-        <div style="min-width:220px"><label class="f">Spot position for this preview</label>
+        <div style="min-width:220px"><label class="f">Preview position before landmarks are entered</label>
           <select id="saltSpot">
             <option value="quarter">Quarter of the way across (as in the notebook)</option>
             <option value="centre">Plate centre</option>
@@ -629,7 +717,7 @@ td.n,th.n{text-align:right;font-variant-numeric:tabular-nums;font-family:var(--m
             <option value="linear">Linear in mM (as in the notebook)</option>
           </select></div>
       </div>
-      <div class="note" style="margin-bottom:0">This preview is the plate itself and does not depend on your tracks. The real analyses use the spot you marked for each recording on the <b>Navigation</b> tab.</div>
+      <div class="note" id="saltPreviewLandmarks" style="margin-bottom:0">When recordings have a goal and plate centre, this preview uses their mean goal position relative to the centre. Set both landmarks in <b>Data &amp; groups</b>.</div>
     </div>
     <div id="saltModelFigs"></div>
   </section>
@@ -766,87 +854,13 @@ td.n,th.n{text-align:right;font-variant-numeric:tabular-nums;font-family:var(--m
         <label class="chk"><input type="checkbox" id="gmMarks"> Mark the reorientations</label>
         <label class="chk"><input type="checkbox" id="gmReo" checked> Reorientations-only panel</label>
         <label class="chk"><input type="checkbox" id="gmRing"> Plate outline and worm ring</label>
-        <div style="width:132px;flex:0 0 132px"><label class="f" for="saltCx">Plate centre x <span class="hint">px</span></label><input type="number" id="saltCx" step="any"></div>
-        <div style="width:132px;flex:0 0 132px"><label class="f" for="saltCy">Plate centre y <span class="hint">px</span></label><input type="number" id="saltCy" step="any"></div>
       </div>
-      <div class="note">Full plate uses the diameter set in Salt gradient and the plate centre in the same pixel coordinates as the tracks.</div>
+      <div class="note">Set recording centres in Data &amp; groups and the plate diameter in Salt gradient.</div>
     </div>
     <div id="gmFigs"><div class="empty">Load data first.</div></div>
     <div class="card"><h3>Salt experienced, per replicate</h3><div class="scroll" id="gmTable"></div></div>
   </section>
 
-
-  <!-- ============ DATA ============ -->
-  <section class="tab" id="tab-data">
-    <div class="head">
-      <h2>Data &amp; groups</h2>
-      <p>One condition per experimental group; one file per plate or replicate. <b>CSV</b> and <b>Excel</b> (<span class="mono">.xlsx</span>) track files both work. Required columns: <span class="mono">WormID, Frame, PositionX, PositionY</span> (<span class="mono">Quality</span> optional). In an Excel workbook these are read from the <span class="mono">Tracks</span> sheet; a <span class="mono">Parameters</span> sheet sets the frame rate and scale automatically, and a <span class="mono">Centerlines</span> sheet unlocks posture-based turn detection. Dropping a whole folder also picks up <span class="mono">worm_summary.json</span> for calibration.</p>
-    </div>
-
-    <div class="card">
-      <h3>Calibration</h3>
-      <div class="grid g3">
-        <div>
-          <label class="f">Frame rate <span class="hint">frames / s</span></label>
-          <input type="number" id="fps" placeholder="leave blank → use frames" step="any" min="0">
-        </div>
-        <div>
-          <label class="f">Spatial scale <span class="hint">pixels / mm</span></label>
-          <input type="number" id="pxmm" placeholder="leave blank → use pixels" step="any" min="0">
-        </div>
-        <div>
-          <label class="f">Rate units for plots</label>
-          <select id="rateUnit">
-            <option value="min">reorientations / minute</option>
-            <option value="sec">reorientations / second</option>
-            <option value="track">reorientations / track (total)</option>
-          </select>
-        </div>
-      </div>
-      <div class="note" id="unitNote"></div>
-    </div>
-
-    <div class="card">
-      <h3>Conditions</h3>
-      <div id="conds"></div>
-      <div class="row" style="margin-top:10px">
-        <button class="btn pri" id="addCond">+ Add condition</button>
-        <button class="btn sm" id="demoBtn">Load example data</button>
-        <button class="btn sm danger" id="clearAll">Clear everything</button>
-      </div>
-    </div>
-
-    <div class="card">
-      <h3>Quality control</h3>
-      <div class="grid g2">
-        <div>
-          <label class="f">Include tracker <span class="mono">Quality</span> codes</label>
-          <div class="row" id="qualBoxes"></div>
-          <div style="font-size:11px;color:var(--ink-3);margin-top:6px">Codes present in your files appear here. In WormLab-style output <span class="mono">3</span> usually marks a lost track (position 0,0) and is excluded by default.</div>
-        </div>
-        <div class="grid" style="gap:10px">
-          <div>
-            <label class="f">Reject jumps larger than <span class="hint">px / frame · 0 = off</span></label>
-            <input type="number" id="maxStep" value="25" step="any" min="0">
-          </div>
-          <div>
-            <label class="f">Minimum track length <span class="hint">frames</span></label>
-            <input type="number" id="minFrames" value="100" step="1" min="0">
-          </div>
-          <div>
-            <label class="f">Exclude near-stationary worms <span class="hint">min. path length, px · 0 = off</span></label>
-            <input type="number" id="minPath" value="200" step="any" min="0">
-          </div>
-          <label class="chk"><input type="checkbox" id="dropZero" checked> Drop rows at exactly (0, 0)</label>
-        </div>
-      </div>
-    </div>
-
-    <div class="card">
-      <h3>Loaded data</h3>
-      <div id="dataSummary"><div class="empty">No files loaded yet.</div></div>
-    </div>
-  </section>
 
   <!-- ============ PARAMS ============ -->
   <section class="tab" id="tab-params">
@@ -1670,7 +1684,19 @@ async function ingestWorkbook(name, file) {
   const centerlines = pickSheet(sheets, 'centerlines', ['point1x', 'point1y']);
   const meta = metaFromParameters(pickSheet(sheets, 'parameters'));
   meta.source = name;
-  return ingestRows(name, tracks, { centerlines, meta });
+  const record = ingestRows(name, tracks, { centerlines, meta });
+  const [header, ...points] = pickSheet(sheets, 'start-end coords') || [];
+  if (!header) return record;
+  const type = findCol(header, ['pointtype']), x = findCol(header, ['positionx']), y = findCol(header, ['positiony']);
+  if ([type, x, y].includes(-1)) return record;
+  const point = key => {
+    const row = points.find(r => String(r[type]).trim().toLowerCase() === key &&
+      [x, y].every(i => String(r[i] ?? '').trim() !== '' && Number.isFinite(Number(r[i]))));
+    return row ? { x: Number(row[x]), y: Number(row[y]) } : undefined;
+  };
+  record.start = point('start point');
+  record.src = point('end point');
+  return record;
 }
 function metaFromJson(text) {
   let j; try { j = JSON.parse(text); } catch (e) { return null; }
@@ -2320,7 +2346,7 @@ function geomFor(f, cd, c) {
   if (c.navMode === 'none' || grad === 'off') return null;
   if (c.navMode === 'dir') return { mode: 'dir', dir: c.navDir, noGrad: grad === 'no' };
   const s = f.src;
-  if (s && isFinite(s.x) && isFinite(s.y)) return { mode: 'point', x: s.x / c.K, y: s.y / c.K, noGrad: grad === 'no' };
+  if (hasPoint(s)) return { mode: 'point', x: s.x / c.K, y: s.y / c.K, noGrad: grad === 'no' };
   if (grad === 'no' && c.noGradRef === 'random') return { mode: 'dir', dir: Math.random() * 360, noGrad: true, random: true };
   return null;
 }
@@ -2609,6 +2635,7 @@ function trackFig(title, tracks, dom, opt) {
       for (let i = tr.xs.length - 1; i >= 0; i--) if (tr.xs[i] != null) { i1 = i; break; }
       if (i1 >= 0) drawMarker(fig, A.sx(tr.xs[i1]), A.sy(tr.ys[i1]), { ...M.end, color: M.end.auto ? tr.color : M.end.color }); }
   });
+  drawLandmarks(fig, opt, A.sx, A.sy, B);
   if (opt.source && isFinite(opt.source.x) && isFinite(opt.source.y)) {
     const X = A.sx(opt.source.x), Y = A.sy(opt.source.y);
     if (X >= B.x0 - 20 && X <= B.x1 + 20 && Y >= B.y0 - 20 && Y <= B.y1 + 20) {
@@ -2627,6 +2654,26 @@ function trackFig(title, tracks, dom, opt) {
     fig.line(X - px, Y, X, Y, { stroke: INK.text, sw: 2.2, cap: 'butt' });
     fig.text(X - px / 2, Y - 5, `${len} ${opt.sUnit}`, { size: 9.5, anchor: 'middle', fill: INK.text }); }
   return fig;
+}
+
+function drawLandmarks(fig, opt, sx, sy, box) {
+  const within = (x, y) => x >= box.x0 && x <= box.x1 && y >= box.y0 && y <= box.y1;
+  (opt.starts || []).forEach(p => {
+    const x = sx(p.x), y = sy(p.y);
+    if (within(x, y)) fig.circle(x, y, 4, { stroke: '#127a4a', sw: 1.4, fill: '#ffffff' });
+  });
+  (opt.sources || []).forEach(p => {
+    if (opt.source && Math.hypot(p.x - opt.source.x, p.y - opt.source.y) < 1e-8) return;
+    const x = sx(p.x), y = sy(p.y);
+    if (within(x, y)) fig.circle(x, y, 3, { stroke: '#d1495b', sw: 1.2, fill: '#ffffff' });
+  });
+  (opt.centres || []).forEach(p => {
+    const x = sx(p.x), y = sy(p.y);
+    if (!within(x, y)) return;
+    const style = { stroke: '#c28b00', sw: 1.6 };
+    fig.line(x - 5, y, x + 5, y, style);
+    fig.line(x, y - 5, x, y + 5, style);
+  });
 }
 
 /* ---------- salt field panels: tracks drawn on the modelled gradient ---------- */
@@ -2785,6 +2832,7 @@ function fieldTrackFig(title, tracks, dom, opt) {
   });
 
   /* --- the spot --- */
+  drawLandmarks(fig, opt, sx, sy, B);
   if (src) { const X = sx(src.x), Y = sy(src.y);
     if (X >= B.x0 - 14 && X <= B.x1 + 14 && Y >= B.y0 - 14 && Y <= B.y1 + 14) {
       fig.circle(X, Y, 4.8, { fill: '#ffffff', op: .92 });
@@ -2826,8 +2874,7 @@ function fieldTrackFig(title, tracks, dom, opt) {
 /* the plate on its own: the model drawn the way the simulation notebook draws it */
 function plateFieldFig(sc, scale) {
   const d = sc.plateDia;
-  const spot = sc.spot === 'centre' ? { x: d / 2, y: d / 2 }
-    : sc.spot === 'edge' ? { x: d / 2, y: d * .1 } : { x: d / 2, y: d / 4 };
+  const spot = saltPreviewSpot(sc);
   return fieldTrackFig(`Modelled salt field — ${fmt(d, 3)} mm plate`, [], [[0, d], [0, d]], {
     sc, source: spot, size: 480, equal: true, flipY: true, sUnit: 'mm', scale: scale || 'log',
     rampName: sc.rampName, contour: true, labels: true, cbar: true, fullPlate: true,
@@ -2837,8 +2884,7 @@ function plateFieldFig(sc, scale) {
 }
 function plateFieldGrid(sc, step) {
   const d = sc.plateDia, st = step || Math.max(0.5, d / 100);
-  const spot = sc.spot === 'centre' ? { x: d / 2, y: d / 2 }
-    : sc.spot === 'edge' ? { x: d / 2, y: d * .1 } : { x: d / 2, y: d / 4 };
+  const spot = saltPreviewSpot(sc);
   const rows = [['x (mm)', 'y (mm)', 'C (mM)']];
   for (let y = 0; y <= d + 1e-9; y += st) for (let x = 0; x <= d + 1e-9; x += st)
     rows.push([+x.toFixed(3), +y.toFixed(3), saltAt(Math.hypot(x - spot.x, y - spot.y) / 10, sc, 0)]);
@@ -3372,18 +3418,15 @@ async function loadFiles(cd, files) {
   if (!ST.qualOn.size) defaultQual();
   renderQual(); renderConds(); schedule();
 }
-/* fill in frame rate / scale from the workbook or worm_summary.json, unless the user has typed one */
+/* Fill in frame rate from the workbook or worm_summary.json. */
 let AUTO_NOTE = '';
 function autoCalibrate() {
   if (RESTORING) return;
   const metas = ST.conds.flatMap(c => c.files.map(f => f.meta || {}));
   const fps = [...new Set(metas.map(m => m.fps).filter(v => isFinite(v) && v > 0))];
-  const pxmm = [...new Set(metas.map(m => m.pxmm).filter(v => isFinite(v) && v > 0))];
   const notes = [];
   if (fps.length && !$('fps').value) { $('fps').value = +fps[0].toFixed(6);
     notes.push(`frame rate set to <b>${+fps[0].toFixed(4)} fps</b> from the file`); }
-  if (pxmm.length && !$('pxmm').value) { $('pxmm').value = +pxmm[0].toFixed(4);
-    notes.push(`scale set to <b>${+pxmm[0].toFixed(2)} px/mm</b> from the file`); }
   if (fps.length && !TOUCHED.has('smoothWin')) {                     // ~0.5 s of smoothing, whatever the frame rate
     let w = Math.round(fps[0] * .5); w = Math.max(3, Math.min(61, w % 2 ? w : w + 1));
     const ord = parseInt($('sgOrder').value, 10) || 2;
@@ -3393,6 +3436,23 @@ function autoCalibrate() {
   if (fps.length > 1) notes.push(`<b>warning:</b> the loaded files report different frame rates (${fps.map(v => +v.toFixed(3)).join(', ')})`);
   AUTO_NOTE = notes.length ? '<div class="note">Auto-detected: ' + notes.join('; ') + '. Change either box to override.</div>' : '';
 }
+function updateSpatialScale() {
+  const scales = ST.conds.flatMap(cd => cd.files.map(f => f.meta?.pxmm))
+    .filter(v => Number.isFinite(v) && v > 0);
+  const manual = TOUCHED.has('pxmm');
+  const lo = minOf(scales), hi = maxOf(scales);
+  const compatible = scales.length > 0 && hi - lo <= 5 + 1e-9;
+  // Average the physical pixel sizes before converting to the app's display units.
+  const meanSize = compatible ? S.mean(scales.map(v => 1000 / v)) : NaN;
+  if (!manual) $('pxmm').value = compatible ? +(1000 / meanSize).toFixed(6) : '';
+  $('autoScaleBtn').disabled = !manual;
+  const note = $('scaleNote');
+  if (manual) note.textContent = 'Manual scale in use. Select Use automatic scale to average the file measurements.';
+  else if (compatible) note.textContent = `Shared scale from ${scales.length} calibrated recording${scales.length === 1 ? '' : 's'} across all conditions. Mean pixel size ${fmt(meanSize, 4)} µm/pixel.`;
+  else if (scales.length) note.textContent = `File scales span ${fmt(lo, 3)} to ${fmt(hi, 3)} px/mm. The limit for automatic averaging is a 5 px/mm spread. Enter a shared scale to analyze distances in millimetres.`;
+  else note.textContent = 'Enter pixels per mm or load a recording with pixel-size metadata.';
+}
+$('autoScaleBtn').onclick = () => { TOUCHED.delete('pxmm'); schedule(); };
 function defaultQual() { ST.qualOn = new Set([...ST.qualCodes].filter(q => q !== 3)); }
 function renderQual() {
   const host = $('qualBoxes'); host.innerHTML = '';
@@ -3473,15 +3533,15 @@ const WATCH = ['fps','pxmm','rateUnit','smoothWin','smoothMethod','sgOrder','dt'
  'saltPeak','saltSigma','saltLambda','saltRamp','saltSpot','saltRing','saltBands','saltRampSel','saltScale',
  'saltWin','saltBins','saltBinMode','saltTrim','saltPerInt','saltTrimFig',
  'gmLayout','gmExtent','gmRamp','gmBands','gmScale','gmSize','gmAt','gmContour','gmLabels','gmHalo','gmCbar','gmMarks','gmReo','gmRing',
- 'saltCx','saltCy'];
+ 'saltCx','saltCy','alignCue'];
 const TOUCHED = new Set();
 WATCH.forEach(id => { const n = $(id); if (!n) return;
   n.addEventListener(n.type === 'checkbox' || n.tagName === 'SELECT' ? 'change' : 'input',
     () => {
       TOUCHED.add(id);
       if (id.startsWith('mk') || id === 'trkStart' || id === 'trkEnd') refreshSwatches();
-      if (['gmExtent', 'saltCx', 'saltCy', 'saltPlateDia'].includes(id)) {
-        Object.keys(ST.zoom).filter(key => /^(gradient_map_|reorientations_on_field_)/.test(key))
+      if (['gmExtent', 'saltCx', 'saltCy', 'saltPlateDia', 'alignCue', 'axOrigin'].includes(id)) {
+        Object.keys(ST.zoom).filter(key => /^(track_|gradient_map_|reorientations_on_field_)/.test(key))
           .forEach(key => delete ST.zoom[key]);
       }
       schedule();
@@ -3559,8 +3619,8 @@ function wideFromPts(name, series, xlab, ylab) {  // curves that carry [x, y] pa
     rows.push(r); });
   return { name, rows };
 }
-function wideFromTracks(name, rows3) {          // raw coordinates behind a track or map panel
-  const rows = [['Condition', 'File', 'Worm', 'Time', 'x', 'y', 'reorientation']];
+function wideFromTracks(name, rows3, coordinateLabel = '') {          // raw coordinates behind a track or map panel
+  const rows = [['Condition', 'File', 'Worm', 'Time', 'x' + coordinateLabel, 'y' + coordinateLabel, 'reorientation']];
   rows3.forEach(({ cond, w, ev }) => { const marks = new Set((ev || []).map(e => e.i));
     for (let i = 0; i < w.n; i++) if (w.xs[i] != null)
       rows.push([cond, w.file, w.id, w.ts[i], w.xs[i], w.ys[i], marks.has(i) ? 'yes' : '']); });
@@ -3586,7 +3646,7 @@ function wideFromValueGroups(name, groups) {      // pooled distributions, one c
 ST.zoom = ST.zoom || {};
 ST.figWide = ST.figWide || {};
 function figCard(key, fig, subtitle, opt = {}) {
-  ST.figs[key] = fig;
+  if (!opt.pickPoint) ST.figs[key] = fig;
   const srcWide = opt.wide != null ? opt.wide : fig.wideData;
   const wides = (Array.isArray(srcWide) ? srcWide : [srcWide]).filter(w => w && w.rows && w.rows.length > 1);
   if (wides.length) ST.figWide[key] = wides.map(w => ({ ...w, figure: fig.title }));
@@ -3625,7 +3685,7 @@ function figCard(key, fig, subtitle, opt = {}) {
   svg.addEventListener('pointerdown', e => {
     if (e.button !== 0) return;
     const [sx, sy] = toSvg(e);
-    if (opt.axisZoom && PICKSRC.on && fig.inv) { drag = { mode: 'pick', sx, sy };
+    if ((opt.pickPoint || (opt.axisZoom && PICKSRC.on)) && fig.inv) { drag = { mode: 'pick', sx, sy };
       svg.setPointerCapture(e.pointerId); e.preventDefault(); return; }
     if (opt.axisZoom && (BOXZOOM.on || e.shiftKey) && fig.inv) {
       drag = { mode: 'box', sx, sy };
@@ -3646,7 +3706,8 @@ function figCard(key, fig, subtitle, opt = {}) {
     if (!drag) return;
     if (drag.mode === 'pick') { const [sx, sy] = toSvg(e);
       if (Math.hypot(sx - drag.sx, sy - drag.sy) < 8) { const d = fig.inv(sx, sy);
-        setSourceFor(opt.condId, d[0], d[1]); }
+        if (opt.pickPoint) opt.pickPoint(...d);
+        else setSourceFor(opt.condId, d[0], d[1]); }
       drag = null; return; }
     if (drag.mode === 'box' && boxEl) {
       const [sx, sy] = toSvg(e);
@@ -3775,6 +3836,7 @@ function tableHTML(key, name, header, rows) {
    8. master render
    ========================================================================== */
 function renderAll() {
+  updateSpatialScale();
   const c = cfg();
   ST.figs = {}; ST.tables = {}; ST.figWide = {};
   $('unitNote').innerHTML = `Time is reported in <b>${c.tUnit}</b>${c.hasTime ? ` (${c.fps} fps)` : ' — enter a frame rate to convert to seconds'}; ` +
@@ -3794,7 +3856,7 @@ function renderAll() {
   if (!hasData) { $('dataSummary').innerHTML = '<div class="empty">No files loaded yet.</div>';
     ['trackFigs','diagFigs','reoFigs','spdFigs','iriFigs','tcFigs','navFigs','roamFigs','saltFigs','gmFigs'].forEach(i => $(i).innerHTML = '<div class="empty">Load data first.</div>');
     $('diagNote').innerHTML = ''; $('trackLegend').innerHTML = '';
-    ['reoStats','spdStats','iriStats','tcStats','navStats','roamStats','saltStats','reoTable','spdTable','iriTable','tcTable','navTable','roamTable','saltTable','gmTable','srcTable'].forEach(i => $(i).innerHTML = '');
+    ['reoStats','spdStats','iriStats','tcStats','navStats','roamStats','saltStats','reoTable','spdTable','iriTable','tcTable','navTable','roamTable','saltTable','gmTable','srcTable','landmarkPicker'].forEach(i => $(i).innerHTML = '');
     $('sideStat').textContent = ''; renderSaltModel(); renderSaltCode(); renderExport(); renderMethods(); renderGuide(); return; }
 
   const anyCL = ST.conds.some(cd => cd.files.some(f => f.hasCenterlines));
@@ -3803,6 +3865,11 @@ function renderAll() {
   if (!anyCL && $('primary').value === 'C') $('primary').value = 'A';
 
   const A = runAnalysis();
+  renderSrcTable(A);
+  ST.tables.recording_landmarks = { name: 'recording_landmarks', rows: [
+    ['Condition', 'Recording', 'Start x (px)', 'Start y (px)', 'Goal x (px)', 'Goal y (px)', 'Recorded centre x (px)', 'Recorded centre y (px)'],
+    ...A.conds.flatMap(cd => cd.files.map(f => [cd.name, f.name, f.start?.x, f.start?.y, f.src?.x, f.src?.y, f.centre?.x, f.centre?.y]))
+  ] };
   if (!TOUCHED.has('tcBin')) { const md = maxOf(A.rows.map(r => r.dur).filter(isFinite));
     if (isFinite(md) && md > 0) { const raw = md / 10;
       const mag = Math.pow(10, Math.floor(Math.log10(raw))), n = raw / mag;
@@ -3833,20 +3900,23 @@ function renderSummary(A) {
     ['Condition', 'Files', 'Worms', 'Analysed', 'Excluded', 'Reason', `Mean duration (${c.tUnit})`, 'With centerlines'], rows);
 }
 
-function domainOf(A) {
-  const c = A.c, align = $('axOrigin').checked;
-  let xs = [], ys = [];
-  A.conds.forEach(cd => cd.used.forEach(w => { const i0 = w.xs.findIndex(v => v != null); if (i0 < 0) return;
-    const ox = align ? w.xs[i0] : 0, oy = align ? w.ys[i0] : 0;
-    for (let i = 0; i < w.xs.length; i++) if (w.xs[i] != null) { xs.push(w.xs[i] - ox); ys.push(w.ys[i] - oy); } }));
+function domainOf(tracks, points = [], manual = true) {
+  const xs = points.map(p => p.x), ys = points.map(p => p.y);
+  tracks.forEach(w => w.xs.forEach((x, i) => { if (x != null) { xs.push(x); ys.push(w.ys[i]); } }));
   if (!xs.length) return [[0, 1], [0, 1]];
-  let xd = [minOf(xs), maxOf(xs)], yd = [minOf(ys), maxOf(ys)];
-  const mx = (xd[1] - xd[0]) * .04 || 1, my = (yd[1] - yd[0]) * .04 || 1;
-  xd = [xd[0] - mx, xd[1] + mx]; yd = [yd[0] - my, yd[1] + my];
-  ST.lastDomain = [xd, yd];
-  if (!$('axAuto').checked) { const g = (id, d) => { const v = parseFloat($(id).value); return isFinite(v) ? v : d; };
-    xd = [g('axXmin', xd[0]), g('axXmax', xd[1])]; yd = [g('axYmin', yd[0]), g('axYmax', yd[1])]; }
-  return [xd, yd];
+  const bounds = [xs, ys].map(values => {
+    const lo = minOf(values), hi = maxOf(values), pad = (hi - lo) * .06 || 1;
+    return [lo - pad, hi + pad];
+  });
+  if (manual) {
+    ST.lastDomain = bounds;
+    if (!$('axAuto').checked) {
+      const value = (id, fallback) => Number.isFinite($(id).valueAsNumber) ? $(id).valueAsNumber : fallback;
+      return [['X', 0], ['Y', 1]].map(([key, i]) =>
+        [value('ax' + key + 'min', bounds[i][0]), value('ax' + key + 'max', bounds[i][1])]);
+    }
+  }
+  return bounds;
 }
 
 /* ---- threshold diagnostics ---- */
@@ -3962,42 +4032,67 @@ $('suggestB').onclick = () => { if (!ST.analysis) return; const { dth } = pooled
 
 function renderTracks(A) {
   const c = A.c, host = $('trackFigs'); host.innerHTML = '';
-  const [xd, yd] = domainOf(A);
   const align = $('axOrigin').checked, mark = $('trkMark').value, size = clamp(parseFloat($('trkSize').value) || 420, 200, 1400);
   const colorMode = $('trkColor').value;
   const M = markerCfg();
   const num = (id, d) => { const v = parseFloat($(id).value); return isFinite(v) ? v : d; };
-  const srcMark = (!align && c.navMode === 'point') ? (cd => { const f = cd.files.find(f2 => f2.src && isFinite(f2.src.x) && isFinite(f2.src.y));
-    return f ? { x: f.src.x / c.K, y: f.src.y / c.K } : null; }) : () => null;
+  const rotate = $('alignCue').checked;
+  const files = new Map(A.conds.flatMap(cd => cd.files.map(f => [f.id, recordingPoints(f, c, A.sc)])));
+  const displayed = new Map(A.conds.flatMap(cd => cd.used.map(w => {
+    const points = files.get(w.fileId);
+    const i = w.xs.findIndex(x => x != null);
+    const origin = align ? points.start || (i >= 0 ? { x: w.xs[i], y: w.ys[i] } : null) : null;
+    const project = pointTransform(points, origin, rotate);
+    const source = c.navMode === 'point' && cd.grad !== 'off' && points.source;
+    return [w, { ...mapTracks(w, project), plotSource: source ? project(source.x, source.y) : null }];
+  })));
+  const [xd, yd] = domainOf([...displayed.values()], [...displayed.values()].map(w => w.plotSource).filter(Boolean));
+  const sourceOptions = worms => {
+    const byFile = new Map();
+    worms.forEach(w => {
+      const source = displayed.get(w).plotSource;
+      if (!source) return;
+      if (!byFile.has(w.fileId)) byFile.set(w.fileId, []);
+      byFile.get(w.fileId).push(source);
+    });
+    const sources = [...byFile.values()].map(meanPoint);
+    return { sources, source: meanPoint(sources) };
+  };
   const opt = { size, equal: $('axEqual').checked, flipY: $('axFlipY').checked, sUnit: c.sUnit,
     markers: M, lw: num('trkLW', 1.1), trackOp: clamp(num('trkOp', .85), .05, 1),
     grid: $('trkGrid').checked, scaleBar: num('trkScale', 0) > 0 ? num('trkScale', 0) : 0 };
-  const mkTrack = (w, color) => { const i0 = w.xs.findIndex(v => v != null);
-    const ox = align && i0 >= 0 ? w.xs[i0] : 0, oy = align && i0 >= 0 ? w.ys[i0] : 0;
-    return { xs: w.xs.map(v => v == null ? null : v - ox), ys: w.ys.map(v => v == null ? null : v - oy), color,
-      marksA: (mark === 'A' || mark === 'both' || mark === 'all') ? w.evA.map(e => ({ x: e.x - ox, y: e.y - oy })) : [],
-      marksB: (mark === 'B' || mark === 'both' || mark === 'all') ? w.evB.map(e => ({ x: e.x - ox, y: e.y - oy })) : [],
-      marksC: (mark === 'C' || mark === 'all') ? w.evC.map(e => ({ x: e.x - ox, y: e.y - oy })) : [] }; };
+  const mkTrack = (raw, color) => {
+    const w = displayed.get(raw);
+    return { xs: w.xs, ys: w.ys, color,
+      marksA: ['A', 'both', 'all'].includes(mark) ? w.evA : [],
+      marksB: ['B', 'both', 'all'].includes(mark) ? w.evB : [],
+      marksC: ['C', 'all'].includes(mark) ? w.evC : [] };
+  };
 
+  const coordinateLabel = align ? ' (start-aligned)' : rotate ? ' (display)' : '';
+  const csvTrack = (cd, raw) => {
+    const w = displayed.get(raw);
+    return { cond: cd.name, w, ev: c.primary === 'C' ? w.evC : c.primary === 'B' ? w.evB : w.evA };
+  };
   const grid = el('div', { class: 'figgrid' });
   if ($('trkLayout').value === 'cond') {
     A.conds.forEach(cd => { if (!cd.used.length) return;
       const trs = cd.used.map((w, i) => mkTrack(w, colorMode === 'worm' ? PALETTE[i % PALETTE.length] : colorMode === 'gray' ? '#8b93a1' : cd.color));
       const nA = cd.used.reduce((s, w) => s + w.evA.length, 0), nB = cd.used.reduce((s, w) => s + w.evB.length, 0),
         nC = cd.used.reduce((s, w) => s + w.evC.length, 0);
-      const fig = trackFig(cd.name, trs, [xd, yd], { ...opt, trackOp: .8, lw: 1.1, source: srcMark(cd) });
+      const fig = trackFig(cd.name, trs, [xd, yd], { ...opt, trackOp: .8, lw: 1.1, ...sourceOptions(cd.used) });
       fig.wideData = wideFromTracks('track_' + safeName(cd.name),
-        cd.used.map(w => ({ cond: cd.name, w, ev: c.primary === 'C' ? w.evC : c.primary === 'B' ? w.evB : w.evA })));
+        cd.used.map(w => csvTrack(cd, w)), coordinateLabel);
       grid.appendChild(figCard('track_' + cd.id, fig,
         `${cd.used.length} worms · ${nA} method-A · ${nB} method-B${nC ? ` · ${nC} method-C` : ''} reorientations`,
         { axisZoom: true, condId: cd.id })); });
   } else {
     A.conds.forEach(cd => cd.used.forEach(w => {
       const color = colorMode === 'gray' ? '#8b93a1' : cd.color;
-      const fig = trackFig(`${cd.name} — worm ${w.id}`, [mkTrack(w, color)], [xd, yd], { ...opt, trackOp: .95, lw: 1.3, source: srcMark(cd) });
-      fig.wideData = wideFromTracks(`track_${safeName(cd.name)}_worm_${w.id}`,
-        [{ cond: cd.name, w, ev: c.primary === 'C' ? w.evC : c.primary === 'B' ? w.evB : w.evA }]);
-      grid.appendChild(figCard(`track_${cd.id}_${w.id}`, fig,
+      const fig = trackFig(`${cd.name} — ${w.file} — worm ${w.id}`, [mkTrack(w, color)], [xd, yd], { ...opt, trackOp: .95, lw: 1.3, ...sourceOptions([w]) });
+      fig.wideData = wideFromTracks(`track_${safeName(cd.name)}_${w.fileId}_worm_${w.id}`,
+        [csvTrack(cd, w)], coordinateLabel);
+      grid.appendChild(figCard(`track_${cd.id}_${w.fileId}_${w.id}`, fig,
         `${w.evA.length} A · ${w.evB.length} B${w.hasCL ? ` · ${w.evC.length} C (${w.nRev} reversals, ${w.nOmega} omega)` : ''}`,
         { axisZoom: true, condId: cd.id })); }));
   }
@@ -4011,10 +4106,14 @@ function renderTracks(A) {
   const ps = el('button', { class: 'btn sm' + (PICKSRC.on ? ' pri' : ''),
     onclick: () => { PICKSRC.on = !PICKSRC.on; if (PICKSRC.on) BOXZOOM.on = false; schedule(); } },
     PICKSRC.on ? '◎ Click the source on a panel…' : '◎ Set odour source by clicking');
-  if (!$('axOrigin').checked && A.c.navMode === 'point') tools.appendChild(ps);
+  if (!align && !rotate && A.c.navMode === 'point') tools.appendChild(ps);
+  else PICKSRC.on = false;
   tools.appendChild(el('span', { style: 'font-size:11.5px;color:var(--ink-3)' },
     'Drag a box (or hold Shift and drag) to set the axis range on every panel at once · ⌘/Ctrl + scroll, or pinch, magnifies any figure · double-click resets'));
   host.appendChild(tools);
+  const missing = rotate && [...files.values()].some(p => !(p.start || p.centre) || !p.source);
+  if (missing) host.appendChild(el('div', { class: 'note' },
+    'Rotation requires a goal and a start point or plate centre. Other recordings retain their original orientation.'));
   host.appendChild(grid);
   const lg = $('trackLegend'); lg.innerHTML = '';
   const item = (m, label) => el('span', {}, [el('span', { class: 'msw', html: markerSwatch(m, 18) }), label]);
@@ -4326,70 +4425,127 @@ function renderTimeCourse(A) {
    8c. navigation relative to the gradient
    ========================================================================== */
 const PICKSRC = { on: false };
-function srcSignature(A) {
-  return A.c.navMode + '|' + ST.conds.map(cd => cd.id + ':' + cd.name + ':' + cd.color + ':' +
-    cd.files.map(f => f.id).join(',')).join(';');
+const LANDMARK_PICKER = { fileId: null, key: 'src' };
+function hasPoint(p) { return Number.isFinite(p?.x) && Number.isFinite(p?.y); }
+function recordingPoints(f, c, sc) {
+  const scaled = p => hasPoint(p) ? { x: p.x / c.K, y: p.y / c.K } : null;
+  return { start: scaled(f.start), source: scaled(f.src),
+    centre: scaled(hasPoint(f.centre) ? f.centre : { x: sc.cx, y: sc.cy }) };
+}
+function pointTransform({ start, centre, source }, origin, rotate) {
+  const anchor = start || centre;
+  const angle = rotate && anchor && source && (anchor.x !== source.x || anchor.y !== source.y)
+    ? Math.PI - Math.atan2(source.y - anchor.y, source.x - anchor.x) : 0;
+  const cos = Math.cos(angle), sin = Math.sin(angle);
+  const project = (x, y) => {
+    const dx = x - (origin?.x ?? 0), dy = y - (origin?.y ?? 0);
+    return { x: cos * dx - sin * dy, y: sin * dx + cos * dy };
+  };
+  return project;
+}
+function meanPoint(points) {
+  return points.length ? { x: S.mean(points.map(p => p.x)), y: S.mean(points.map(p => p.y)) } : null;
+}
+function mapTracks(w, project) {
+  const points = w.xs.map((x, i) => x == null ? null : project(x, w.ys[i]));
+  return { ...w, xs: points.map(p => p?.x ?? null), ys: points.map(p => p?.y ?? null),
+    evA: w.evA.map(e => ({ ...e, ...project(e.x, e.y) })),
+    evB: w.evB.map(e => ({ ...e, ...project(e.x, e.y) })),
+    evC: w.evC.map(e => ({ ...e, ...project(e.x, e.y) })) };
 }
 function renderSrcTable(A) {
   const host = $('srcTable');
-  const sig = srcSignature(A);
-  const noGrad = ST.conds.filter(cd => cd.grad === 'no').map(cd => cd.name);
-  const noteHtml =
-    'Coordinates are in the same pixel units as your tracks. Easiest route: go to the Tracks tab, turn on <b>Set odour source by clicking</b>, and click the spot on a panel — that fills in every file of that condition.' +
-    (noGrad.length ? ` <b>${noGrad.join(', ')}</b> ${noGrad.length === 1 ? 'is' : 'are'} treated as no-gradient control${noGrad.length === 1 ? '' : 's'}: analysed identically, against the position the cue would have occupied, and drawn with a dashed line.` : '');
-
-  /* Rebuilding on every keystroke would steal focus from the box being typed into,
-     so the table is only rebuilt when the conditions or files actually change. */
-  if (host.dataset.sig === sig) {
-    const n = $('srcNote'); if (n) n.innerHTML = noteHtml;
-    ST.conds.forEach(cd => { const sel = host.querySelector(`select[data-cond="${cd.id}"]`);
-      if (sel && sel.value !== (cd.grad || 'yes')) sel.value = cd.grad || 'yes';
-      cd.files.forEach(f => ['x', 'y'].forEach(k => {
-        const inp = host.querySelector(`input[data-file="${f.id}"][data-k="${k}"]`);
-        if (inp && document.activeElement !== inp) {
-          const v = f.src && isFinite(f.src[k]) ? String(f.src[k]) : '';
-          if (inp.value !== v) inp.value = v; } })); });
-    return;
+  const sig = JSON.stringify(A.conds.map(cd => [cd.id, cd.name, cd.color, cd.files.map(f => f.id)]));
+  const axes = [['start', 'Start'], ['src', 'Goal'], ['centre', 'Plate centre']];
+  if (host.dataset.sig !== sig || !host.firstChild) {
+    host.innerHTML = '';
+    host.dataset.sig = sig;
+    const tbl = el('table');
+    tbl.innerHTML = '<thead><tr><th>Condition</th><th>Gradient</th><th>Recording</th><th>Start x (px)</th><th>Start y (px)</th><th>Goal x (px)</th><th>Goal y (px)</th><th>Centre x (px)</th><th>Centre y (px)</th><th></th></tr></thead>';
+    const body = el('tbody');
+    A.conds.forEach(cd => {
+      const files = cd.files.length ? cd.files : [null];
+      files.forEach((f, i) => {
+        const row = el('tr');
+        if (i === 0) {
+          row.appendChild(el('td', { rowspan: files.length }, cd.name));
+          const select = el('select', { 'data-cond': cd.id });
+          [['yes', 'Gradient present'], ['no', 'No gradient (control)'], ['off', 'Exclude from navigation']]
+            .forEach(([value, label]) => select.appendChild(el('option', { value }, label)));
+          select.onchange = () => { ST.conds.find(c => c.id === cd.id).grad = select.value; schedule(); };
+          row.appendChild(el('td', { rowspan: files.length }, select));
+        }
+        if (f) {
+          row.appendChild(el('td', {}, f.name));
+          axes.forEach(([key, label]) => ['x', 'y'].forEach(axis => {
+            const input = el('input', { type: 'number', step: 'any', style: 'width:80px',
+              'data-point': f.id + '-' + key + '-' + axis, 'aria-label': label + ' ' + axis + ' for ' + f.name });
+            input.oninput = () => {
+              f[key] = { ...f[key], [axis]: input.valueAsNumber };
+              schedule();
+            };
+            row.appendChild(el('td', {}, input));
+          }));
+          row.appendChild(el('td', {}, [
+            el('button', { class: 'btn sm', onclick: () => {
+              LANDMARK_PICKER.fileId = f.id;
+              renderLandmarkPicker(ST.analysis);
+              $('landmarkPicker').scrollIntoView({ block: 'nearest' });
+            } }, 'Mark on plot'),
+            el('button', { class: 'btn sm', onclick: () => {
+              axes.forEach(([key]) => {
+                if (hasPoint(f[key])) cd.files.forEach(other => { other[key] = { ...f[key] }; });
+              });
+              schedule();
+            } }, 'Copy to condition')
+          ]));
+        } else row.appendChild(el('td', { colspan: '8' }, 'No files loaded'));
+        body.appendChild(row);
+      });
+    });
+    tbl.appendChild(body);
+    host.appendChild(tbl);
   }
-  host.innerHTML = ''; host.dataset.sig = sig;
-  if (!ST.conds.length) { host.innerHTML = '<div class="empty">No conditions loaded.</div>'; host.dataset.sig = ''; return; }
-  const tbl = el('table');
-  tbl.innerHTML = '<thead><tr><th>Condition</th><th>Gradient</th><th>File</th><th>Cue x (px)</th><th>Cue y (px)</th><th></th></tr></thead>';
-  const tb = el('tbody');
-  ST.conds.forEach(cd => {
-    const files = cd.files.length ? cd.files : [null];
-    files.forEach((f, fi) => {
-      const tr = el('tr');
-      if (fi === 0) {
-        const tdName = el('td', { rowspan: String(files.length) });
-        tdName.appendChild(el('span', { class: 'chip' }, [el('span', { class: 'dot', style: `background:${cd.color}` }), cd.name]));
-        tr.appendChild(tdName);
-        const tdG = el('td', { rowspan: String(files.length) });
-        const sel = el('select', { style: 'min-width:172px', 'data-cond': cd.id });
-        [['yes', 'Gradient present'], ['no', 'No gradient (control)'], ['off', 'Exclude from navigation']]
-          .forEach(([v, lab]) => { const o = el('option', { value: v }, lab); if ((cd.grad || 'yes') === v) o.selected = true; sel.appendChild(o); });
-        sel.onchange = () => { cd.grad = sel.value; schedule(); };
-        tdG.appendChild(sel); tr.appendChild(tdG);
-      }
-      if (!f) { tr.appendChild(el('td', { colspan: '4', style: 'color:var(--ink-3);font-size:12px' }, 'no files loaded')); tb.appendChild(tr); return; }
-      tr.appendChild(el('td', { class: 'mono', style: 'font-size:11px' }, f.name));
-      if (A.c.navMode === 'dir') {
-        tr.appendChild(el('td', { colspan: '3', style: 'color:var(--ink-3);font-size:12px' }, 'fixed direction — no position needed'));
-      } else {
-        ['x', 'y'].forEach(k => { const inp = el('input', { type: 'number', step: 'any', style: 'width:110px', 'data-file': f.id, 'data-k': k });
-          inp.value = f.src && isFinite(f.src[k]) ? f.src[k] : '';
-          inp.oninput = () => { const v = parseFloat(inp.value); f.src = f.src || {};
-            f.src[k] = isFinite(v) ? v : NaN; schedule(); };
-          const td = el('td'); td.appendChild(inp); tr.appendChild(td); });
-        const td = el('td');
-        td.appendChild(el('button', { class: 'btn sm', onclick: () => { if (!f.src) return;
-          ST.conds.forEach(c2 => c2.files.forEach(f2 => f2.src = { ...f.src })); host.dataset.sig = ''; schedule(); } }, 'Copy to all'));
-        tr.appendChild(td);
-      }
-      tb.appendChild(tr); });
+  A.conds.forEach(cd => {
+    host.querySelector(`select[data-cond="${cd.id}"]`).value = cd.grad || 'yes';
+    cd.files.forEach(f => axes.forEach(([key]) => ['x', 'y'].forEach(axis => {
+      const input = host.querySelector(`input[data-point="${f.id}-${key}-${axis}"]`);
+      if (input !== document.activeElement) input.value = Number.isFinite(f[key]?.[axis]) ? f[key][axis] : '';
+    })));
   });
-  tbl.appendChild(tb); host.appendChild(tbl);
-  host.appendChild(el('div', { class: 'note', id: 'srcNote', html: noteHtml }));
+  renderLandmarkPicker(A);
+}
+function renderLandmarkPicker(A) {
+  const host = $('landmarkPicker');
+  host.innerHTML = '';
+  const f = A?.conds.flatMap(cd => cd.files).find(file => file.id === LANDMARK_PICKER.fileId);
+  if (!f) return;
+  const points = recordingPoints(f, A.c, A.sc);
+  const tracks = A.conds.flatMap(cd => cd.used).filter(w => w.fileId === f.id);
+  const xs = [], ys = [];
+  tracks.forEach(w => w.xs.forEach((x, i) => { if (x != null) { xs.push(x); ys.push(w.ys[i]); } }));
+  [points.start, points.source, points.centre].filter(Boolean).forEach(p => { xs.push(p.x); ys.push(p.y); });
+  host.appendChild(el('div', { class: 'row', style: 'margin:10px 0' }, [
+    ...[['start', 'Mark start'], ['src', 'Mark goal'], ['centre', 'Mark plate centre']].map(([key, label]) =>
+      el('button', { class: 'btn sm' + (LANDMARK_PICKER.key === key ? ' pri' : ''), onclick: () => {
+        LANDMARK_PICKER.key = key; renderLandmarkPicker(ST.analysis);
+      } }, label)),
+    el('button', { class: 'btn sm', onclick: () => { LANDMARK_PICKER.fileId = null; host.innerHTML = ''; } }, 'Close')
+  ]));
+  const dom = [xs, ys].map(v => {
+    if (!v.length) return [0, A.c.hasSpace ? A.sc.plateDia : 100];
+    const lo = minOf(v), hi = maxOf(v), pad = A.c.hasSpace ? Math.max((hi - lo) * .12, A.sc.plateDia / 2) : Math.max((hi - lo) / 2, 50);
+    return [lo - pad, hi + pad];
+  });
+  const fig = trackFig(f.name, tracks, dom, { size: 500, equal: true, flipY: $('axFlipY').checked,
+    sUnit: A.c.sUnit, markers: markerCfg(), source: points.source, starts: [points.start].filter(Boolean),
+    centres: [points.centre].filter(Boolean) });
+  host.appendChild(figCard('landmark_' + f.id, fig, 'Click the plot to save the selected landmark for this recording.', {
+    pickPoint: (x, y) => {
+      f[LANDMARK_PICKER.key] = { x: +(x * A.c.K).toFixed(2), y: +(y * A.c.K).toFixed(2) };
+      schedule();
+    }
+  }));
 }
 
 function bearingSeries(cd, reps) {
@@ -4482,11 +4638,10 @@ function renderBearing(withNav, c, grid, panel) {
 
 function renderNav(A) {
   const c = A.c, host = $('navFigs'), statHost = $('navStats'), tabHost = $('navTable');
-  renderSrcTable(A);
   host.innerHTML = ''; statHost.innerHTML = ''; tabHost.innerHTML = '';
   if (c.navMode === 'none') { host.innerHTML = '<div class="empty">Gradient analyses are switched off.</div>'; return; }
   const withNav = A.conds.map(cd => ({ cd, ws: cd.used.filter(w => w.nav) })).filter(o => o.ws.length);
-  if (!withNav.length) { host.innerHTML = '<div class="empty">Mark the odour source above (or click it on a track panel) to unlock these analyses.</div>'; return; }
+  if (!withNav.length) { host.innerHTML = '<div class="empty">Set the goal location in Data &amp; groups to unlock these analyses.</div>'; return; }
 
   const grid = el('div', { class: 'figgrid' });
   const blocks = [], zeroRows = [];
@@ -4622,14 +4777,23 @@ function renderRoam(A) {
 /* ============================================================================
    8e. salt gradient — model preview, response plots, map, and the code behind it
    ========================================================================== */
-function saltSpotFor(cd, c) {
-  const f = (cd.files || []).find(f2 => f2.src && isFinite(f2.src.x) && isFinite(f2.src.y));
-  return f ? { x: f.src.x / c.K, y: f.src.y / c.K } : null;
+function saltPreviewSpot(sc) {
+  const d = sc.plateDia, c = cfg(), rotate = $('alignCue').checked;
+  const points = ST.conds.filter(cd => cd.grad !== 'off').flatMap(cd => cd.files)
+    .map(f => recordingPoints(f, c, sc)).filter(p => p.source && p.centre);
+  const mean = meanPoint(points.map(p => pointTransform(p, p.centre, rotate)(p.source.x, p.source.y)));
+  if (c.navMode === 'point' && c.hasSpace && mean) return { x: d / 2 + mean.x, y: d / 2 + mean.y, count: points.length };
+  return { x: d / 2, y: sc.spot === 'centre' ? d / 2 : sc.spot === 'edge' ? d * .1 : d / 4 };
 }
 function renderSaltModel() {
   const sc = saltCfg(), host = $('saltModelFigs');
   const scale = $('saltScale') ? $('saltScale').value : 'log';
   $('saltAltBox').style.display = sc.model === 'drops' ? 'none' : '';
+  const preview = saltPreviewSpot(sc);
+  $('saltSpot').disabled = Boolean(preview.count);
+  $('saltPreviewLandmarks').textContent = preview.count
+    ? `Using the mean goal from ${preview.count} recording${preview.count === 1 ? '' : 's'}. Edit landmarks in Data & groups.`
+    : 'Using the preview position. Mark each goal and plate centre in Data & groups to use the recordings here.';
   const h = agarHeight(sc);
   $('saltHTag').textContent = `agar ${fmt(h, 4)} cm · peak ${fmt(saltPeakC(sc, 0), 4)} mM`;
   host.innerHTML = '';
@@ -4648,7 +4812,8 @@ function renderSaltModel() {
     'This single curve is the whole model: everything else in the app is this function evaluated at each position of each animal.',
     { wide: wideFromPts('salt_profile_radial', [{ name: 'C (mM)', pts }], 'distance from the drop (mm)') }));
 
-  const spotY = sc.spot === 'centre' ? d / 2 : sc.spot === 'edge' ? d * .1 : d / 4;
+  const spot = preview;
+  const spotY = d / 2 - Math.hypot(spot.x - d / 2, spot.y - d / 2);
   const line = [];
   for (let k = 0; k <= 200; k++) { const y = d * k / 200; line.push([y, saltAt(Math.abs(y - spotY) / 10, sc, 0)]); }
   grid.appendChild(figCard('salt_profile_centreline',
@@ -4684,7 +4849,8 @@ function renderSaltModel() {
 function saltSetupCard(c, where) {
   const sc = saltCfg();
   const anyFiles = ST.conds.some(cd => cd.files.length);
-  const spotCount = ST.conds.filter(cd => cd.files.some(f => f.src && isFinite(f.src.x) && isFinite(f.src.y))).length;
+  const recordings = ST.conds.filter(cd => cd.grad !== 'off').flatMap(cd => cd.files);
+  const spotCount = recordings.filter(f => hasPoint(f.src)).length;
   const box = el('div', { class: 'card' });
   box.appendChild(el('h3', {}, 'Two things are needed before this tab can draw'));
   box.appendChild(el('div', { class: 'note', style: 'margin-top:0' },
@@ -4696,7 +4862,7 @@ function saltSetupCard(c, where) {
 
   if (!anyFiles) {
     box.appendChild(row(false, 'Load some tracks first',
-      'Drop your CSV or Excel files on the Tracks tab, or add them under Data & groups.'));
+      'Add your CSV or Excel recordings in Data & groups.'));
     return box;
   }
 
@@ -4718,31 +4884,15 @@ function saltSetupCard(c, where) {
 
   /* ---- 2. the spot ---- */
   const geomOK = c.navMode === 'point';
-  box.appendChild(row(geomOK && spotCount === ST.conds.length && spotCount > 0, 'Where the salt drop was',
+  box.appendChild(row(geomOK && spotCount === recordings.length && spotCount > 0, 'Where the salt drop was',
     !geomOK ? 'the cue geometry is set to "' + (c.navMode === 'dir' ? 'fixed direction' : 'no gradient') + '" — the salt field is radial, so it needs a position'
       : spotCount === 0 ? 'no position marked yet'
-        : spotCount < ST.conds.length ? `marked for ${spotCount} of ${ST.conds.length} conditions — the rest will be left out`
-          : `marked for all ${spotCount} conditions`));
-  const sx = el('input', { type: 'number', step: 'any', style: 'width:110px', placeholder: 'x in px' });
-  const sy = el('input', { type: 'number', step: 'any', style: 'width:110px', placeholder: 'y in px' });
-  const first = ST.conds.flatMap(cd => cd.files).find(f => f.src && isFinite(f.src.x));
-  if (first) { sx.value = first.src.x; sy.value = first.src.y; }
-  const tools = el('div', { class: 'row', style: 'margin:0 0 6px 62px' }, [
-    el('button', { class: 'btn sm pri', onclick: () => { $('navMode').value = 'point';
-      PICKSRC.on = true; BOXZOOM.on = false; schedule();
-      document.querySelector('.nav button[data-tab="tracks"]').click(); } }, '◎ Click it on a track panel'),
-    el('span', { style: 'font-size:12px;color:var(--ink-3)' }, 'or type the pixel coordinates:'), sx, sy,
-    el('button', { class: 'btn sm', onclick: () => { const x = parseFloat(sx.value), y = parseFloat(sy.value);
-      if (!isFinite(x) || !isFinite(y)) { alert('Enter both coordinates, in the same pixel units as your track files.'); return; }
-      $('navMode').value = 'point';
-      ST.conds.forEach(cd => cd.files.forEach(f => f.src = { x, y }));
-      const st = $('srcTable'); if (st) st.dataset.sig = '';
-      schedule(); } }, 'Use for every file'),
-    el('button', { class: 'btn sm', onclick: () => document.querySelector('.nav button[data-tab="nav"]').click() }, 'Per-file table →')]);
-  box.appendChild(tools);
-  box.appendChild(el('div', { class: 'note', style: 'margin-left:62px',
-    html: 'The coordinates are in the same units as the <span class="mono">PositionX</span> column of your files — raw pixels, not millimetres. Clicking it on a track panel is the reliable way: the crosshair shows you where it landed.' }));
-
+        : spotCount < recordings.length ? `marked for ${spotCount} of ${recordings.length} recordings`
+          : `marked for all ${spotCount} recordings`));
+  box.appendChild(el('button', { class: 'btn sm pri', onclick: () => {
+    if (c.navMode !== 'point') { $('navMode').value = 'point'; schedule(); }
+    document.querySelector('.nav button[data-tab="data"]').click();
+  } }, 'Set recording landmarks in Data & groups'));
   if (!c.hasTime) box.appendChild(el('div', { class: 'note',
     html: 'No frame rate is set, so rates and dC/dt will be expressed per frame rather than per second. That is fine for comparing conditions recorded on the same rig; set a frame rate on <b>Analysis settings</b> if you want real units.' }));
   if (where === 'resp') box.appendChild(el('div', { class: 'row' }, [
@@ -4785,7 +4935,7 @@ function renderSalt(A) {
     html: 'No frame rate is set, so time is counted in frames and this y-axis reads <b>reorientations per 1000 frames</b> — the same fallback every other rate plot in the app is using right now. Put your frame rate in the box above and every one of them, these included, switches to <b>reorientations per minute</b>.' }));
   const noSpot = A.conds.filter(cd => cd.used.length && !cd.used.some(w => w.salt)).map(cd => cd.name);
   if (noSpot.length) host.appendChild(el('div', { class: 'note warn',
-    html: `No salt spot is marked for <b>${noSpot.join('</b>, <b>')}</b>, so ${noSpot.length === 1 ? 'that condition is' : 'those conditions are'} left out of these plots. Mark the spot on the Navigation tab to include ${noSpot.length === 1 ? 'it' : 'them'}.` }));
+    html: `No salt spot is marked for <b>${noSpot.join('</b>, <b>')}</b>, so ${noSpot.length === 1 ? 'that condition is' : 'those conditions are'} left out of these plots. Mark the goal in Data &amp; groups to include ${noSpot.length === 1 ? 'it' : 'them'}.` }));
 
   const rowOf = new Map(A.rows.map(r => [r.fileId + '|' + r.worm, r]));
   const grid = el('div', { class: 'figgrid' });
@@ -4888,43 +5038,45 @@ function renderSalt(A) {
 function renderGradMap(A) {
   const c = A.c, sc = A.sc, host = $('gmFigs'), tabHost = $('gmTable');
   host.innerHTML = ''; tabHost.innerHTML = '';
-  const spots = new Map();
-  A.conds.forEach(cd => { const s = saltSpotFor(cd, c); if (s) spots.set(cd.id, s); });
-  if (!c.hasSpace || c.navMode !== 'point' || !spots.size) { host.appendChild(saltSetupCard(c, 'map')); return; }
-  const noSpot = A.conds.filter(cd => cd.used.length && !spots.has(cd.id)).map(cd => cd.name);
-  if (noSpot.length) host.appendChild(el('div', { class: 'note warn',
-    html: `No salt spot is marked for <b>${noSpot.join('</b>, <b>')}</b>, so ${noSpot.length === 1 ? 'that condition has' : 'those conditions have'} no panel here.` }));
-
+  const files = new Map(A.conds.filter(cd => cd.grad !== 'off').flatMap(cd => {
+    const used = new Set(cd.used.map(w => w.fileId));
+    return cd.files.filter(f => used.has(f.id));
+  })
+    .map(f => [f.id, recordingPoints(f, c, sc)]).filter(([, p]) => p.source));
+  if (!c.hasSpace || c.navMode !== 'point' || !files.size) { host.appendChild(saltSetupCard(c, 'map')); return; }
+  const omitted = A.conds.filter(cd => cd.grad !== 'off').flatMap(cd => cd.files).filter(f => !hasPoint(f.src));
+  if (omitted.length) host.appendChild(el('div', { class: 'note' },
+    `Excluded from the map until a goal is marked: ${omitted.map(f => f.name).join(', ')}.`));
   const num = (id, d) => { const v = parseFloat($(id).value); return isFinite(v) ? v : d; };
   const gsc = { ...sc, bands: Math.max(3, Math.round(num('gmBands', 12))), rampName: $('gmRamp').value };
   const scale = $('gmScale').value, layout = $('gmLayout').value, size = clamp(num('gmSize', 460), 240, 1400);
-  const hasCentre = Number.isFinite(sc.cx) && Number.isFinite(sc.cy);
   const wantsFull = $('gmExtent').value === 'plate';
-  const fullPlate = wantsFull && hasCentre;
-  if (wantsFull && !hasCentre) host.appendChild(el('div', { class: 'note' },
-    'Showing the track region. Enter both plate centre coordinates above to show the full plate.'));
+  const hasCentres = [...files.values()].every(p => p.centre);
+  const hasStarts = [...files.values()].every(p => p.start);
+  const fullPlate = wantsFull && hasCentres;
+  const anchor = fullPlate || (!hasStarts && hasCentres) ? 'centre' : hasStarts ? 'start' : null;
+  const rotate = Boolean(anchor) && $('alignCue').checked;
+  if (wantsFull && !hasCentres) host.appendChild(el('div', { class: 'note' }, hasStarts
+    ? 'Showing the track region aligned by start point. Mark the plate centres in Data & groups for a full-plate map.'
+    : 'Showing the track region in original coordinates. Mark the plate centres in Data & groups for a full-plate map.'));
+  const projects = new Map([...files].map(([id, points]) =>
+    [id, pointTransform(points, points[anchor], rotate)]));
+  const projectedSources = new Map([...files].map(([id, { source }]) => [id, projects.get(id)(source.x, source.y)]));
+  const coordinateLabel = anchor === 'centre' ? ' (plate-aligned)' : anchor === 'start' ? ' (start-aligned)' : '';
+  const mapGroups = A.conds.filter(cd => cd.grad !== 'off').map(cd => ({
+    ...cd,
+    sources: cd.files.map(f => projectedSources.get(f.id)).filter(Boolean),
+    used: cd.used.filter(w => projects.has(w.fileId)).map(w => mapTracks(w, projects.get(w.fileId)))
+  })).filter(cd => cd.used.length);
+  const [xd, yd] = domainOf(mapGroups.flatMap(cd => cd.used), [...projectedSources.values()], false);
   const when = $('gmAt').value;
   const durs = A.rows.map(r => r.dur).filter(isFinite);
   const span = durs.length ? S.median(durs) : 0;
   const tAdd = sc.live ? (when === 'mid' ? span / 2 : when === 'end' ? span : 0) : 0;
   const mark = $('gmMarks').checked, M = markerCfg();
-  const align = $('axOrigin').checked;
-
-  /* The field is tied to real plate coordinates, so a common origin cannot be used here. */
-  let [xd, yd] = domainOf(A);
-  if (align) { const pts = [];
-    A.conds.forEach(cd => cd.used.forEach(w => { for (let i = 0; i < w.xs.length; i++) if (w.xs[i] != null) pts.push([w.xs[i], w.ys[i]]); }));
-    if (pts.length) { xd = [minOf(pts.map(p => p[0])), maxOf(pts.map(p => p[0]))];
-      yd = [minOf(pts.map(p => p[1])), maxOf(pts.map(p => p[1]))];
-      const mx = (xd[1] - xd[0]) * .04 || 1, my = (yd[1] - yd[0]) * .04 || 1;
-      xd = [xd[0] - mx, xd[1] + mx]; yd = [yd[0] - my, yd[1] + my]; } }
-  [...spots.values()].forEach(s => { const m = Math.max((xd[1] - xd[0]), (yd[1] - yd[0])) * .06;
-    xd = [Math.min(xd[0], s.x - m), Math.max(xd[1], s.x + m)];
-    yd = [Math.min(yd[0], s.y - m), Math.max(yd[1], s.y + m)]; });
-
   const showRing = $('gmRing').checked;
-  const plate = hasCentre && (fullPlate || showRing)
-    ? { cx: sc.cx / c.K, cy: sc.cy / c.K, dia: sc.plateDia, ring: showRing ? sc.ring : 0 } : null;
+  const plate = anchor === 'centre' && (fullPlate || showRing)
+    ? { cx: 0, cy: 0, dia: sc.plateDia, ring: showRing ? sc.ring : 0 } : null;
   const base = { sc: gsc, size, equal: true, flipY: $('axFlipY').checked, sUnit: c.sUnit, scale,
     rampName: gsc.rampName, contour: $('gmContour').checked, labels: $('gmLabels').checked,
     halo: $('gmHalo').checked, cbar: $('gmCbar').checked, markers: M, plate, fullPlate, tAdd,
@@ -4950,52 +5102,55 @@ function renderGradMap(A) {
 
   const grid = el('div', { class: 'figgrid' });
   if (layout === 'overlay') {
-    const spot = [...spots.values()][0];
-    const trs = A.conds.flatMap(cd => cd.used.map(w => mkTrack(w, cd.color)));
+    const sources = mapGroups.flatMap(cd => cd.sources);
+    const spot = meanPoint(sources);
+    const trs = mapGroups.flatMap(cd => cd.used.map(w => mkTrack(w, cd.color)));
     grid.appendChild(figCard('gradient_map_all', fieldTrackFig('All conditions on the salt field', trs, [xd, yd],
-      { ...base, source: spot, note, legend: A.conds.filter(cd => cd.used.length).map(cd => ({ label: cd.name, color: cd.color })) }),
-      'Every track on one plate. The shading is the modelled salt field; darker is more salt.',
+      { ...base, source: spot, sources, note, legend: mapGroups.filter(cd => cd.used.length).map(cd => ({ label: cd.name, color: cd.color })) }),
+      'All conditions on one plate.',
       { wide: wideFromTracks('gradient_map_all_tracks',
-          A.conds.flatMap(cd => cd.used.map(w => ({ cond: cd.name, w, ev: evOf(w) })))) }));
-    if ($('gmReo').checked) { const ws = A.conds.flatMap(cd => cd.used);
-      const marks = A.conds.filter(cd => cd.used.length).map(cd => mkMarksOnly(cd.used, cd.color));
+          mapGroups.flatMap(cd => cd.used.map(w => ({ cond: cd.name, w, ev: evOf(w) }))), coordinateLabel) }));
+    if ($('gmReo').checked) { const ws = mapGroups.flatMap(cd => cd.used);
+      const marks = mapGroups.filter(cd => cd.used.length).map(cd => mkMarksOnly(cd.used, cd.color));
       reoPanels.push(figCard('reorientations_on_field_all',
         fieldTrackFig('Reorientations on the salt field — all conditions', marks, [xd, yd],
-          { ...base, source: spot, note, markers: markerFor('#d1495b'), halo: false,
-            legend: A.conds.filter(cd => cd.used.length).map(cd => ({ label: cd.name, marker: { ...M[c.primary], color: cd.color } })) }),
+          { ...base, source: spot, sources, note, markers: markerFor('#d1495b'), halo: false,
+            legend: mapGroups.filter(cd => cd.used.length).map(cd => ({ label: cd.name, marker: { ...M[c.primary], color: cd.color } })) }),
         reoCap(ws), { wide: wideFromEventList('reorientations_on_field_all',
-          A.conds.flatMap(cd => cd.used.map(w => ({ cond: cd.name, w, ev: evOf(w) })))) })); }
+          mapGroups.flatMap(cd => cd.used.map(w => ({ cond: cd.name, w, ev: evOf(w) })))) })); }
   } else if (layout === 'worm') {
-    A.conds.forEach(cd => { const spot = spots.get(cd.id); if (!spot) return;
+    mapGroups.forEach(cd => { const spot = meanPoint(cd.sources);
       if ($('gmReo').checked) reoPanels.push(figCard('reorientations_on_field_' + cd.id,
         fieldTrackFig(cd.name + ' — reorientations on the salt field', [mkMarksOnly(cd.used, cd.color)], [xd, yd],
-          { ...base, source: spot, note, markers: markerFor(cd.color), halo: false }),
+          { ...base, source: spot, sources: cd.sources, note, markers: markerFor(cd.color), halo: false }),
         reoCap(cd.used), { wide: wideFromEventList('reorientations_on_field_' + safeName(cd.name),
           cd.used.map(w => ({ cond: cd.name, w, ev: evOf(w) }))) }));
-      cd.used.forEach(w => grid.appendChild(figCard(`gradient_map_${cd.id}_${w.id}`,
-        Object.assign(fieldTrackFig(`${cd.name} — worm ${w.id} on the salt field`, [mkTrack(w, cd.color)], [xd, yd], { ...base, source: spot, note }),
-          { wideData: wideFromTracks(`gradient_map_${safeName(cd.name)}_worm_${w.id}`, [{ cond: cd.name, w, ev: evOf(w) }]) }),
+      cd.used.forEach(w => grid.appendChild(figCard(`gradient_map_${cd.id}_${w.fileId}_${w.id}`,
+        Object.assign(fieldTrackFig(`${cd.name} — ${w.file} — worm ${w.id} on the salt field`, [mkTrack(w, cd.color)], [xd, yd], { ...base, source: projectedSources.get(w.fileId), note }),
+          { wideData: wideFromTracks(`gradient_map_${safeName(cd.name)}_${w.fileId}_worm_${w.id}`, [{ cond: cd.name, w, ev: evOf(w) }], coordinateLabel) }),
         w.salt ? `mean ${fmt(w.salt.meanC, 3)} mM · ${fmt(w.salt.startC, 3)} → ${fmt(w.salt.endC, 3)} mM · closest approach ${fmt(w.salt.minR, 3)} mm` : ''))); });
   } else {
-    A.conds.forEach(cd => { if (!cd.used.length) return;
-      const spot = spots.get(cd.id); if (!spot) return;
+    mapGroups.forEach(cd => { if (!cd.used.length) return;
+      const spot = meanPoint(cd.sources);
       const trs = cd.used.map(w => mkTrack(w, cd.color));
       const mc = cd.used.map(w => w.salt ? w.salt.meanC : NaN).filter(isFinite);
       grid.appendChild(figCard('gradient_map_' + cd.id,
         fieldTrackFig(cd.name + ' on the salt field' + (cd.grad === 'no' && !/no.?gradient/i.test(cd.name) ? ' (no gradient)' : ''), trs, [xd, yd],
-          { ...base, source: spot, note, wideData: null }),
+          { ...base, source: spot, sources: cd.sources, note, wideData: null }),
         `${cd.used.length} worms` + (mc.length ? ` · mean salt experienced ${fmt(S.mean(mc), 3)} mM` : '') +
         (cd.grad === 'no' ? ' · this plate had no gradient; the field shown is where it would have been' : ''),
         { wide: wideFromTracks('gradient_map_' + safeName(cd.name),
-            cd.used.map(w => ({ cond: cd.name, w, ev: evOf(w) }))) })); });
-    if ($('gmReo').checked) A.conds.forEach(cd => { if (!cd.used.length) return;
-      const spot = spots.get(cd.id); if (!spot) return;
+            cd.used.map(w => ({ cond: cd.name, w, ev: evOf(w) })), coordinateLabel) })); });
+    if ($('gmReo').checked) mapGroups.forEach(cd => { if (!cd.used.length) return;
+      const spot = meanPoint(cd.sources);
       reoPanels.push(figCard('reorientations_on_field_' + cd.id,
         fieldTrackFig(cd.name + ' — reorientations on the salt field', [mkMarksOnly(cd.used, cd.color)], [xd, yd],
-          { ...base, source: spot, note, markers: markerFor(cd.color), halo: false }),
+          { ...base, source: spot, sources: cd.sources, note, markers: markerFor(cd.color), halo: false }),
         reoCap(cd.used), { wide: wideFromEventList('reorientations_on_field_' + safeName(cd.name),
           cd.used.map(w => ({ cond: cd.name, w, ev: evOf(w) }))) })); });
   }
+  host.appendChild(el('div', { class: 'note' },
+    'In an overlay, the filled marker and shading use the mean goal. Open circles mark individual goals. Salt exposure uses each recording’s own goal.'));
   host.appendChild(grid);
   if (reoPanels.length) { const g2 = el('div', { class: 'figgrid' });
     reoPanels.forEach(p => g2.appendChild(p));
@@ -5358,7 +5513,7 @@ $('zipAll').onclick = async () => {
     /* The original uploads, filed under their condition, plus the manifest and project
        description that let the whole thing be opened again and reproduce these numbers. */
     const withSource = $('zipSource').checked;
-    const manifest = [['Condition', 'Gradient', 'Kind', 'File in archive', 'Original name', 'Worms', 'Rows', 'Centerlines', 'Cue x (px)', 'Cue y (px)', 'Status']];
+    const manifest = [['Condition', 'Gradient', 'Kind', 'File in archive', 'Original name', 'Worms', 'Rows', 'Centerlines', 'Start x (px)', 'Start y (px)', 'Cue x (px)', 'Cue y (px)', 'Centre x (px)', 'Centre y (px)', 'Status']];
     const project = { app: 'Worm Track Analyzer', format: 1, generated: new Date().toISOString(),
       settings: settingsObj(), conditions: [] };
     let missing = 0;
@@ -5377,13 +5532,13 @@ $('zipAll').onclick = async () => {
           const r = it.rec;
           const row = [cd.name, cd.grad || 'yes', it.kind, path, it.name,
             r ? r.worms.length : '', r ? r.nRows : '', r ? (r.hasCenterlines ? 'yes' : 'no') : '',
-            r && r.src && isFinite(r.src.x) ? r.src.x : '', r && r.src && isFinite(r.src.y) ? r.src.y : '', 'included'];
+            r?.start?.x, r?.start?.y, r?.src?.x, r?.src?.y, r?.centre?.x, r?.centre?.y, 'included'];
           try {
             if (!it.blob) throw new Error('no copy of this file is held');
             files.push({ name: path, data: await blobBytes(it.blob) });
             (it.kind === 'tracks' ? pc.files : pc.extras).push({ path, originalName: it.name,
-              source: r && r.src && isFinite(r.src.x) && isFinite(r.src.y) ? { x: r.src.x, y: r.src.y } : null });
-          } catch (e) { row[3] = ''; row[10] = 'could not be re-read: ' + e.message; missing++; }
+              start: r?.start || null, source: r?.src || null, centre: r?.centre || null, pxmm: r?.meta?.pxmm });
+          } catch (e) { row[3] = ''; row[row.length - 1] = 'could not be re-read: ' + e.message; missing++; }
           manifest.push(row);
         }
         project.conditions.push(pc);
@@ -5457,6 +5612,7 @@ function applySettings(o) {
     const n = $(k); if (!n) return;
     if (n.type === 'checkbox') n.checked = !!v; else n.value = v;
     TOUCHED.add(k); });
+  if (o.__autoScale === true) TOUCHED.delete('pxmm');
   if (o.__quality) ST.qualOn = new Set(o.__quality.map(Number));
   [['omegaThr', 'omegaThrR'], ['angThr', 'angThrR']].forEach(([n, r]) => { $(r).value = $(n).value; });
   [['tcrit', 'tcritR', 'tcritV'], ['angWin', 'angWinR', 'angWinV'], ['refrac', 'refracR', 'refracV']]
@@ -5494,7 +5650,10 @@ async function openProjectZip(file) {
           ? await ingestWorkbook(pf.originalName || base, blob)
           : ingestCSV(pf.originalName || base, new TextDecoder().decode(bytes));
         rec.blob = blob;
-        if (pf.source && isFinite(pf.source.x) && isFinite(pf.source.y)) rec.src = { ...pf.source };
+        if (Number.isFinite(pf.pxmm) && pf.pxmm > 0) rec.meta.pxmm = pf.pxmm;
+        if (pf.start) rec.start = { ...pf.start };
+        if (pf.source) rec.src = { ...pf.source };
+        if (pf.centre) rec.centre = { ...pf.centre };
         cd.files.push(rec);
       } catch (e) { problems.push(`${base}: ${e.message}`); }
     }
@@ -5506,7 +5665,7 @@ async function openProjectZip(file) {
   applySettings(proj.settings || {});
   RESTORING = false;
   renderQual(); renderConds(); schedule();
-  document.querySelector('.nav button[data-tab="tracks"]').click();
+  document.querySelector('.nav button[data-tab="data"]').click();
   if (problems.length) alert('Project opened, but some files had problems:\n' + problems.join('\n'));
   return true;
 }
@@ -5529,13 +5688,33 @@ $('openProj').onchange = async () => { const f = $('openProj').files[0]; if (f) 
 
 function settingsObj() { const o = {}; document.querySelectorAll('input,select').forEach(n => { if (!n.id || n.type === 'file' || n.type === 'range') return;
   o[n.id] = n.type === 'checkbox' ? n.checked : n.value; });
+  o.__autoScale = !TOUCHED.has('pxmm');
   o.__quality = [...ST.qualOn]; o.__conditions = ST.conds.map(c => ({ name: c.name, color: c.color, gradient: c.grad || 'yes',
-    files: c.files.map(f => ({ name: f.name, source: f.src || null })) }));
+    files: c.files.map(f => ({ name: f.name, start: f.start || null, source: f.src || null, centre: f.centre || null })) }));
   o.__generated = new Date().toISOString(); return o; }
 $('saveCfg').onclick = () => saveBlob(new Blob([JSON.stringify(settingsObj(), null, 2)], { type: 'application/json' }), 'worm_analysis_settings.json');
 $('loadCfgBtn').onclick = () => $('loadCfg').click();
 $('loadCfg').onchange = async () => { const f = $('loadCfg').files[0]; if (!f) return;
-  try { applySettings(JSON.parse(await f.text())); renderQual(); schedule(); }
+  try {
+    const settings = JSON.parse(await f.text());
+    applySettings(settings);
+    const conditions = [...(settings.__conditions || [])];
+    ST.conds.forEach(cd => {
+      const i = conditions.findIndex(saved => saved.name === cd.name);
+      if (i < 0) return;
+      const [saved] = conditions.splice(i, 1);
+      const files = [...(saved.files || [])];
+      cd.files.forEach(record => {
+        const j = files.findIndex(file => file.name === record.name);
+        if (j < 0) return;
+        const [landmarks] = files.splice(j, 1);
+        if ('start' in landmarks) record.start = landmarks.start;
+        if ('source' in landmarks) record.src = landmarks.source;
+        if ('centre' in landmarks) record.centre = landmarks.centre;
+      });
+    });
+    renderQual(); schedule();
+  }
   catch (e) { alert('Could not read settings: ' + e.message); }
   $('loadCfg').value = ''; };
 </script>
@@ -5637,7 +5816,7 @@ function renderMethods() {
 <h4>The no-gradient control</h4>
 <p>A slope, a curving-rate relationship or a change in bearing is only interpretable against a condition where there was nothing to navigate towards. Conditions marked <b>No gradient</b> are therefore not skipped: they go through exactly the same pipeline, using the position the cue would have occupied on those plates, so the assay geometry, the plate edges, any lighting asymmetry and any bias in the tracker itself all enter the control the same way they enter the test. If no position was marked for such a condition, each animal is instead assigned a random reference direction, which is the stricter null but discards the geometry.</p>
 <p>Each condition is also tested against zero with a one-sample t-test, with Holm correction across the table. A signed-rank p-value is shown alongside. Use the direct condition comparison to assess how much the gradient and no-gradient slopes differ. No-gradient conditions are identified in the plot legend and under their slope points.</p>
-<p>Two caveats. The rotation treats the source as effectively distant, which is a good approximation while the animal is far from it and a poor one once it is on top of it. And the whole section is only meaningful if the source coordinates are right — mark them by clicking on the track panel and check that the crosshair lands where the spot actually was.</p>
+<p>Two caveats. The rotation treats the source as effectively distant, which is a good approximation while the animal is far from it and a poor one once it is on top of it. And the whole section is only meaningful if the source coordinates are right — mark the goal for each recording in Data &amp; groups and check the crosshair against the original video coordinates.</p>
 
 <h3>Roaming and dwelling</h3>
 <p>On food, <i>C. elegans</i> alternates between a fast, straight, exploratory state and a slow, highly curved, stationary one. Following the standard approach, the track is cut into ${fmt(c.roamBin)} ${T} bins and each bin is summarised by its mean speed and its mean absolute angular speed; the classifier is a threshold on log₁₀(speed ÷ angular speed), which is a diagonal line in that two-dimensional space. The threshold is chosen automatically by Otsu's method — the value that best separates the histogram into two groups — and can be overridden.</p>
@@ -5725,7 +5904,7 @@ function renderGuide() {
 <p><b>Speed &amp; distance</b> — how fast they moved, how far they travelled in total, and how far they actually got from where they started. The ratio of those last two, <b>path efficiency</b>, tells you whether the animal went somewhere or just went round in circles. The <b>mean squared displacement</b> plot answers "how quickly does a population of these animals spread out?" — a steeper line means faster spreading.</p>
 <p><b>Runs</b> — how long and how far the animal travelled between turns.</p>
 <p><b>Navigation</b> — only useful if there is a gradient. It asks whether the animal is <i>steering</i>, in the two ways worms actually do it: turning less often when already pointed the right way, and gently curving toward the target while crawling.</p>
-<p><b>A note on controls.</b> If some of your plates had no odour on them, say so — mark that condition <i>No gradient</i> on the Navigation tab. The tool then measures it in exactly the same way, pretending the odour was where it would have been. That is the whole point: the control tells you what "no steering" looks like on your own rig, including any lopsidedness in the plate, the camera or the tracker. A steering result you believe looks like this: the gradient condition is clearly different from zero, and the no-gradient condition is not.</p>
+<p><b>A note on controls.</b> If some of your plates had no odour on them, say so — mark that condition <i>No gradient</i> in Data &amp; groups. The tool then measures it in exactly the same way, pretending the odour was where it would have been. That is the whole point: the control tells you what "no steering" looks like on your own rig, including any lopsidedness in the plate, the camera or the tracker. A steering result you believe looks like this: the gradient condition is clearly different from zero, and the no-gradient condition is not.</p>
 <p><b>Roaming &amp; dwelling</b> — worms on food flip between exploring (fast and straight) and staying put (slow and wiggly). This tab measures how much time each group spends in each mode.</p>
 <p><b>Time course</b> — everything above, but split into time bins, so you can see whether a difference was there from the start or built up over the assay.</p>
 <p><b>Salt gradient</b> — where you describe the plate: how big it was, how much agar, and the drops of salt you put on it and when. From that the tool works out the concentration everywhere on the plate. You only do this once.</p>
