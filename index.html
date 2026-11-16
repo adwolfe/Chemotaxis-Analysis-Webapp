@@ -249,7 +249,7 @@ td.n,th.n{text-align:right;font-variant-numeric:tabular-nums;font-family:var(--m
       <div class="row">
         <label class="chk"><input type="checkbox" id="alignCue" checked> Rotate each recording so the goal lies to the left on the x-axis</label>
       </div>
-      <div class="note">Excel files with a start-end coords sheet fill in the start and goal automatically. Coordinates are in original video pixels. Rotation uses the line from the start to the goal, or the plate centre when a start is unavailable.</div>
+      <div class="note">Excel files with a start-end coords sheet fill in the start and goal automatically. Coordinates are in original video pixels. Tracks can rotate around the start-to-goal axis. Full-plate maps use the centre-to-goal axis.</div>
       <div class="scroll" id="srcTable"></div>
       <div id="landmarkPicker"></div>
       <details style="margin-top:10px"><summary>Shared centre for recordings without a centre</summary>
@@ -853,6 +853,11 @@ td.n,th.n{text-align:right;font-variant-numeric:tabular-nums;font-family:var(--m
         <label class="chk"><input type="checkbox" id="gmCbar" checked> Colour bar</label>
         <label class="chk"><input type="checkbox" id="gmMarks"> Mark the reorientations</label>
         <label class="chk"><input type="checkbox" id="gmReo" checked> Reorientations-only panel</label>
+        <label for="gmReoColor">Reorientation colour
+          <select id="gmReoColor">
+            <option value="condition">By condition</option>
+            <option value="bearing">By bearing (Viridis)</option>
+          </select></label>
         <label class="chk"><input type="checkbox" id="gmRing"> Plate outline and worm ring</label>
       </div>
       <div class="note">Set recording centres in Data &amp; groups and the plate diameter in Salt gradient.</div>
@@ -2469,6 +2474,8 @@ function niceTicks(min, max, target = 5) {
   if (min === max) { min -= .5; max += .5; }
   const span = max - min, step0 = span / target, mag = Math.pow(10, Math.floor(Math.log10(step0)));
   const norm = step0 / mag; const step = (norm < 1.5 ? 1 : norm < 3 ? 2 : norm < 7 ? 5 : 10) * mag;
+  // At this precision, adding a tick step may leave the value unchanged.
+  if (!(step > Number.EPSILON * Math.max(Math.abs(min), Math.abs(max)))) return [min];
   const out = []; for (let v = Math.ceil(min / step) * step; v <= max + step * 1e-9; v += step) {
     const r = +v.toPrecision(12); out.push(Math.abs(r) < step * 1e-6 ? 0 : r); }
   return out.length ? out : [min, max];
@@ -2699,6 +2706,19 @@ function clipPolyRect(pts, x0, y0, x1, y1) {
 }
 const RAMPS = { grey: ['#ffffff', '#949eab'], blue: ['#f8fcff', '#97c5e5'], warm: ['#fffbf4', '#eec18e'] };
 const CONTOUR_INK = { grey: '#69727f', blue: '#5589ae', warm: '#b2824a', none: '#69727f' };
+// Viridis samples from Matplotlib, interpolated for the display and export.
+const VIRIDIS = [[68, 1, 84], [71, 45, 123], [59, 82, 139], [44, 114, 142], [33, 145, 140],
+  [40, 174, 128], [94, 201, 98], [173, 220, 48], [253, 231, 37]];
+function bearingColor(bearing) {
+  if (!Number.isFinite(bearing)) return '#909090';
+  const pos = clamp((bearing + 1) / 2, 0, 1) * (VIRIDIS.length - 1);
+  const lo = Math.floor(pos), hi = Math.ceil(pos);
+  return '#' + VIRIDIS[lo].map((v, i) => Math.round(v + (VIRIDIS[hi][i] - v) * (pos - lo))
+    .toString(16).padStart(2, '0')).join('');
+}
+function preTurnBearing(w, e) {
+  return w.nav?.cosB[e.span[0] - 1];
+}
 function rampColor(name, u) {
   const st = RAMPS[name] || RAMPS.grey;
   const h = s => [parseInt(s.slice(1, 3), 16), parseInt(s.slice(3, 5), 16), parseInt(s.slice(5, 7), 16)];
@@ -2736,8 +2756,9 @@ function fieldTrackFig(title, tracks, dom, opt) {
   const full = opt.fullPlate && plate;
   const cbarOn = opt.cbar !== false;
   const legN = (opt.legend && opt.legend.length) ? opt.legend.length : 0;
+  const bearingSpace = opt.colorByBearing ? 44 : 0;
   const pad = { l: full ? 12 : 56, r: cbarOn ? 88 : 16, t: 26,
-    b: full ? 12 + (legN ? 24 : 0) + (opt.scaleBar ? 24 : 0) : (legN ? 70 : 46) };
+    b: (full ? 12 + (legN ? 24 : 0) + (opt.scaleBar ? 24 : 0) : (legN ? 70 : 46)) + bearingSpace };
   const radius = full ? plate.dia / 2 : 0;
   const [xd, yd] = full
     ? [[plate.cx - radius, plate.cx + radius], [plate.cy - radius, plate.cy + radius]] : dom;
@@ -2825,10 +2846,12 @@ function fieldTrackFig(title, tracks, dom, opt) {
     const lw = opt.lw || 1.3;
     if (opt.halo !== false) segs.forEach(s => fig.poly(s, { stroke: '#ffffff', sw: lw + 1.8, op: .8 }));
     segs.forEach(s => fig.poly(s, { stroke: tr.color, sw: lw, op: opt.trackOp == null ? .95 : opt.trackOp }));
-    const mk = k => tr.markColor ? { ...M[k], color: tr.markColor } : M[k];
-    (tr.marksA || []).forEach(m => drawMarker(fig, sx(m.x), sy(m.y), mk('A')));
-    (tr.marksB || []).forEach(m => drawMarker(fig, sx(m.x), sy(m.y), mk('B')));
-    (tr.marksC || []).forEach(m => drawMarker(fig, sx(m.x), sy(m.y), mk('C')));
+    ['A', 'B', 'C'].forEach(k => (tr['marks' + k] || []).forEach(m => {
+      const x = sx(m.x), y = sy(m.y);
+      if (opt.colorByBearing) fig.circle(x, y, Math.max(2, (M[k].size || 8) / 2),
+        { fill: bearingColor(m.bearing), stroke: '#ffffff', sw: .7 });
+      else drawMarker(fig, x, y, tr.markColor ? { ...M[k], color: tr.markColor } : M[k]);
+    }));
   });
 
   /* --- the spot --- */
@@ -2863,7 +2886,17 @@ function fieldTrackFig(title, tracks, dom, opt) {
     fig.line(X - px, Y, X, Y, { stroke: INK.text, sw: 2.2, cap: 'butt' });
     fig.text(X - px / 2, Y - 5, `${len} ${opt.sUnit}`, { size: 9.5, anchor: 'middle', fill: INK.text }); }
   if (opt.note) fig.text(B.x0 + 6, B.y0 + 13, opt.note, { size: 9, fill: INK.tick });
-  if (legN) legendRow(fig, opt.legend, H - 16, B.x0, B.x1);
+  if (legN) legendRow(fig, opt.legend, H - 16 - bearingSpace, B.x0, B.x1);
+  if (opt.colorByBearing) {
+    const width = bw, x = B.x0, y = H - 31, steps = 64;
+    fig.text(x + width / 2, y - 5, 'Pre-turn bearing (cos θ)', { size: 9, anchor: 'middle', fill: INK.tick });
+    for (let i = 0; i < steps; i++) {
+      fig.rect(x + width * i / steps, y, width / steps + .2, 8, { fill: bearingColor(2 * i / (steps - 1) - 1) });
+    }
+    fig.text(x, y + 21, '−1 Away', { size: 9, fill: INK.tick });
+    fig.text(x + width / 2, y + 21, '0', { size: 9, anchor: 'middle', fill: INK.tick });
+    fig.text(x + width, y + 21, '+1 Toward', { size: 9, anchor: 'end', fill: INK.tick });
+  }
   fig.inv = (px, py) => {
     const u = (px - B.x0) / bw, x = xd[0] + u * (xd[1] - xd[0]);
     const v = opt.flipY ? (py - B.y0) / bh : (B.y1 - py) / bh;
@@ -3532,7 +3565,7 @@ const WATCH = ['fps','pxmm','rateUnit','smoothWin','smoothMethod','sgOrder','dt'
  'sdV1','sdT1','sdV2','sdT2','sdV3','sdT3','sdV4','sdT4',
  'saltPeak','saltSigma','saltLambda','saltRamp','saltSpot','saltRing','saltBands','saltRampSel','saltScale',
  'saltWin','saltBins','saltBinMode','saltTrim','saltPerInt','saltTrimFig',
- 'gmLayout','gmExtent','gmRamp','gmBands','gmScale','gmSize','gmAt','gmContour','gmLabels','gmHalo','gmCbar','gmMarks','gmReo','gmRing',
+ 'gmLayout','gmExtent','gmRamp','gmBands','gmScale','gmSize','gmAt','gmContour','gmLabels','gmHalo','gmCbar','gmMarks','gmReo','gmReoColor','gmRing',
  'saltCx','saltCy','alignCue'];
 const TOUCHED = new Set();
 WATCH.forEach(id => { const n = $(id); if (!n) return;
@@ -3627,10 +3660,10 @@ function wideFromTracks(name, rows3, coordinateLabel = '') {          // raw coo
   return rows.length > 1 ? { name, rows } : null;
 }
 function wideFromEventList(name, list) {        // one row per reorientation
-  const rows = [['Condition', 'File', 'Worm', 'Time', 'x', 'y', 'C there (mM)']];
+  const rows = [['Condition', 'File', 'Worm', 'Time', 'x', 'y', 'C there (mM)', 'Pre-turn bearing (cos θ)']];
   list.forEach(({ cond, w, ev }) => (ev || []).forEach(e => {
     const i = Math.max(0, e.span[0] - 1);
-    rows.push([cond, w.file, w.id, e.t, e.x, e.y, w.salt ? w.salt.C[i] : '']); }));
+    rows.push([cond, w.file, w.id, e.t, e.x, e.y, w.salt ? w.salt.C[i] : '', preTurnBearing(w, e)]); }));
   return rows.length > 1 ? { name, rows } : null;
 }
 function wideFromValues(name, label, vals) {      // a pooled distribution, one column
@@ -4443,6 +4476,10 @@ function pointTransform({ start, centre, source }, origin, rotate) {
   };
   return project;
 }
+function clearGradientMapZoom() {
+  Object.keys(ST.zoom).filter(key => /^(gradient_map_|reorientations_on_field_)/.test(key))
+    .forEach(key => delete ST.zoom[key]);
+}
 function meanPoint(points) {
   return points.length ? { x: S.mean(points.map(p => p.x)), y: S.mean(points.map(p => p.y)) } : null;
 }
@@ -4482,6 +4519,7 @@ function renderSrcTable(A) {
               'data-point': f.id + '-' + key + '-' + axis, 'aria-label': label + ' ' + axis + ' for ' + f.name });
             input.oninput = () => {
               f[key] = { ...f[key], [axis]: input.valueAsNumber };
+              clearGradientMapZoom();
               schedule();
             };
             row.appendChild(el('td', {}, input));
@@ -4496,6 +4534,7 @@ function renderSrcTable(A) {
               axes.forEach(([key]) => {
                 if (hasPoint(f[key])) cd.files.forEach(other => { other[key] = { ...f[key] }; });
               });
+              clearGradientMapZoom();
               schedule();
             } }, 'Copy to condition')
           ]));
@@ -4543,6 +4582,7 @@ function renderLandmarkPicker(A) {
   host.appendChild(figCard('landmark_' + f.id, fig, 'Click the plot to save the selected landmark for this recording.', {
     pickPoint: (x, y) => {
       f[LANDMARK_PICKER.key] = { x: +(x * A.c.K).toFixed(2), y: +(y * A.c.K).toFixed(2) };
+      clearGradientMapZoom();
       schedule();
     }
   }));
@@ -4781,7 +4821,8 @@ function saltPreviewSpot(sc) {
   const d = sc.plateDia, c = cfg(), rotate = $('alignCue').checked;
   const points = ST.conds.filter(cd => cd.grad !== 'off').flatMap(cd => cd.files)
     .map(f => recordingPoints(f, c, sc)).filter(p => p.source && p.centre);
-  const mean = meanPoint(points.map(p => pointTransform(p, p.centre, rotate)(p.source.x, p.source.y)));
+  const mean = meanPoint(points.map(p =>
+    pointTransform({ ...p, start: null }, p.centre, rotate)(p.source.x, p.source.y)));
   if (c.navMode === 'point' && c.hasSpace && mean) return { x: d / 2 + mean.x, y: d / 2 + mean.y, count: points.length };
   return { x: d / 2, y: sc.spot === 'centre' ? d / 2 : sc.spot === 'edge' ? d * .1 : d / 4 };
 }
@@ -5038,11 +5079,11 @@ function renderSalt(A) {
 function renderGradMap(A) {
   const c = A.c, sc = A.sc, host = $('gmFigs'), tabHost = $('gmTable');
   host.innerHTML = ''; tabHost.innerHTML = '';
-  const files = new Map(A.conds.filter(cd => cd.grad !== 'off').flatMap(cd => {
+  const recordings = A.conds.filter(cd => cd.grad !== 'off').flatMap(cd => {
     const used = new Set(cd.used.map(w => w.fileId));
     return cd.files.filter(f => used.has(f.id));
-  })
-    .map(f => [f.id, recordingPoints(f, c, sc)]).filter(([, p]) => p.source));
+  });
+  const files = new Map(recordings.map(f => [f.id, recordingPoints(f, c, sc)]).filter(([, p]) => p.source));
   if (!c.hasSpace || c.navMode !== 'point' || !files.size) { host.appendChild(saltSetupCard(c, 'map')); return; }
   const omitted = A.conds.filter(cd => cd.grad !== 'off').flatMap(cd => cd.files).filter(f => !hasPoint(f.src));
   if (omitted.length) host.appendChild(el('div', { class: 'note' },
@@ -5051,16 +5092,21 @@ function renderGradMap(A) {
   const gsc = { ...sc, bands: Math.max(3, Math.round(num('gmBands', 12))), rampName: $('gmRamp').value };
   const scale = $('gmScale').value, layout = $('gmLayout').value, size = clamp(num('gmSize', 460), 240, 1400);
   const wantsFull = $('gmExtent').value === 'plate';
+  const missingCentres = recordings.filter(f => files.has(f.id) && !files.get(f.id).centre);
+  const fullPlate = wantsFull && missingCentres.length < files.size;
+  if (fullPlate && missingCentres.length) {
+    missingCentres.forEach(f => files.delete(f.id));
+    host.appendChild(el('div', { class: 'note' },
+      `Full plate shows recordings with a centre. Missing centre for ${missingCentres.map(f => f.name).join(', ')}. These recordings are available in Track region.`));
+  }
   const hasCentres = [...files.values()].every(p => p.centre);
   const hasStarts = [...files.values()].every(p => p.start);
-  const fullPlate = wantsFull && hasCentres;
   const anchor = fullPlate || (!hasStarts && hasCentres) ? 'centre' : hasStarts ? 'start' : null;
   const rotate = Boolean(anchor) && $('alignCue').checked;
-  if (wantsFull && !hasCentres) host.appendChild(el('div', { class: 'note' }, hasStarts
-    ? 'Showing the track region aligned by start point. Mark the plate centres in Data & groups for a full-plate map.'
-    : 'Showing the track region in original coordinates. Mark the plate centres in Data & groups for a full-plate map.'));
+  if (wantsFull && !fullPlate) host.appendChild(el('div', { class: 'note' },
+    `Showing the track region ${hasStarts ? 'aligned by start point' : 'in original coordinates'}. Missing centre for ${missingCentres.map(f => f.name).join(', ')}.`));
   const projects = new Map([...files].map(([id, points]) =>
-    [id, pointTransform(points, points[anchor], rotate)]));
+    [id, pointTransform(anchor === 'centre' ? { ...points, start: null } : points, points[anchor], rotate)]));
   const projectedSources = new Map([...files].map(([id, { source }]) => [id, projects.get(id)(source.x, source.y)]));
   const coordinateLabel = anchor === 'centre' ? ' (plate-aligned)' : anchor === 'start' ? ' (start-aligned)' : '';
   const mapGroups = A.conds.filter(cd => cd.grad !== 'off').map(cd => ({
@@ -5086,8 +5132,11 @@ function renderGradMap(A) {
     marksC: mark && c.primary === 'C' ? w.evC : [] });
   /* the same panel with the paths removed: only the places a reorientation began */
   const evOf = w => c.primary === 'C' ? w.evC : c.primary === 'B' ? w.evB : w.evA;
+  const colorByBearing = $('gmReoColor').value === 'bearing';
   const mkMarksOnly = (ws, color) => { const o = { xs: [], ys: [], color, markColor: color, marksA: [], marksB: [], marksC: [] };
-    o[c.primary === 'C' ? 'marksC' : c.primary === 'B' ? 'marksB' : 'marksA'] = ws.flatMap(evOf);
+    o['marks' + c.primary] = colorByBearing
+      ? ws.flatMap(w => evOf(w).map(e => ({ ...e, bearing: preTurnBearing(w, e) })))
+      : ws.flatMap(evOf);
     return o; };
   const markerFor = color => { const over = k => ({ ...M[k], color });
     return { ...M, A: over('A'), B: over('B'), C: over('C'), start: { ...M.start, on: false }, end: { ...M.end, on: false } }; };
@@ -5096,7 +5145,7 @@ function renderGradMap(A) {
   const reoCap = ws => { const n = ws.reduce((a, w) => a + evOf(w).length, 0), cc = concAt(ws);
     return `${n} reorientation${n === 1 ? '' : 's'} (method ${c.primary})` +
       (cc.length ? ` · median salt where they began ${fmt(S.median(cc), 3)} mM, mean ${fmt(S.mean(cc), 3)} mM` : '') +
-      ' · the paths are removed so the pattern of turning, not the time spent, is what you see'; };
+      (colorByBearing ? ' · bearing is measured just before the turn relative to the recording’s goal. Grey marks indicate missing headings.' : ''); };
   const reoPanels = [];
   const note = tAdd ? `field at t = ${fmt(tAdd, 3)} ${c.tUnit}` : null;
 
@@ -5114,15 +5163,15 @@ function renderGradMap(A) {
       const marks = mapGroups.filter(cd => cd.used.length).map(cd => mkMarksOnly(cd.used, cd.color));
       reoPanels.push(figCard('reorientations_on_field_all',
         fieldTrackFig('Reorientations on the salt field — all conditions', marks, [xd, yd],
-          { ...base, source: spot, sources, note, markers: markerFor('#d1495b'), halo: false,
-            legend: mapGroups.filter(cd => cd.used.length).map(cd => ({ label: cd.name, marker: { ...M[c.primary], color: cd.color } })) }),
+          { ...base, source: spot, sources, note, markers: markerFor('#d1495b'), halo: false, colorByBearing,
+            legend: colorByBearing ? [] : mapGroups.map(cd => ({ label: cd.name, marker: { ...M[c.primary], color: cd.color } })) }),
         reoCap(ws), { wide: wideFromEventList('reorientations_on_field_all',
           mapGroups.flatMap(cd => cd.used.map(w => ({ cond: cd.name, w, ev: evOf(w) })))) })); }
   } else if (layout === 'worm') {
     mapGroups.forEach(cd => { const spot = meanPoint(cd.sources);
       if ($('gmReo').checked) reoPanels.push(figCard('reorientations_on_field_' + cd.id,
         fieldTrackFig(cd.name + ' — reorientations on the salt field', [mkMarksOnly(cd.used, cd.color)], [xd, yd],
-          { ...base, source: spot, sources: cd.sources, note, markers: markerFor(cd.color), halo: false }),
+          { ...base, source: spot, sources: cd.sources, note, markers: markerFor(cd.color), halo: false, colorByBearing }),
         reoCap(cd.used), { wide: wideFromEventList('reorientations_on_field_' + safeName(cd.name),
           cd.used.map(w => ({ cond: cd.name, w, ev: evOf(w) }))) }));
       cd.used.forEach(w => grid.appendChild(figCard(`gradient_map_${cd.id}_${w.fileId}_${w.id}`,
@@ -5145,7 +5194,7 @@ function renderGradMap(A) {
       const spot = meanPoint(cd.sources);
       reoPanels.push(figCard('reorientations_on_field_' + cd.id,
         fieldTrackFig(cd.name + ' — reorientations on the salt field', [mkMarksOnly(cd.used, cd.color)], [xd, yd],
-          { ...base, source: spot, sources: cd.sources, note, markers: markerFor(cd.color), halo: false }),
+          { ...base, source: spot, sources: cd.sources, note, markers: markerFor(cd.color), halo: false, colorByBearing }),
         reoCap(cd.used), { wide: wideFromEventList('reorientations_on_field_' + safeName(cd.name),
           cd.used.map(w => ({ cond: cd.name, w, ev: evOf(w) }))) })); });
   }
@@ -5166,10 +5215,10 @@ function renderGradMap(A) {
   A.conds.forEach(cd => cd.used.forEach(w => evOf(w).forEach(e => {
     const i = Math.max(0, e.span[0] - 1);
     evRows.push([cd.name, cd.grad === 'no' ? 'no' : 'yes', w.file, w.id, e.t, e.x, e.y,
-      w.salt ? w.salt.C[i] : NaN, w.salt ? w.salt.r[i] : NaN, w.salt ? w.salt.dC[i] : NaN]); })));
+      w.salt ? w.salt.C[i] : NaN, w.salt ? w.salt.r[i] : NaN, w.salt ? w.salt.dC[i] : NaN, preTurnBearing(w, e)]); })));
   if (evRows.length) ST.tables['reorientation_locations'] = { name: 'reorientation_locations',
     rows: [['Condition', 'Gradient', 'File', 'Worm', `Time (${c.tUnit})`, `x (${c.sUnit})`, `y (${c.sUnit})`,
-      'C there (mM)', 'Distance from drop (mm)', 'ΔC there (mM)'], ...evRows] };
+      'C there (mM)', 'Distance from drop (mm)', 'ΔC there (mM)', 'Pre-turn bearing (cos θ)'], ...evRows] };
   tabHost.innerHTML = rows.length ? tableHTML('salt_experienced', 'salt_experienced',
     ['Condition', 'Gradient', 'File', 'Worm', 'C at start (mM)', 'C at end (mM)', 'Net ΔC (mM)', 'Mean C (mM)', 'Closest approach (mm)'], rows)
     : '<div class="empty">Salt values need both a frame rate and a scale.</div>';

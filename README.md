@@ -107,10 +107,16 @@ Enter each recording’s goal and plate centre in **Data & groups**, in original
 Excel files with a `start-end coords` sheet fill the recording start and salt peak automatically.
 The **Mark on plot** control edits one recording at a time. Tracks align to the recording start
 when available and otherwise to each worm’s first position. Whole-plate maps align recording centres
-using the diameter under **Salt gradient**.
-The rotation setting puts each goal on the left of the x-axis. Overlay shading uses the mean
+using the diameter under **Salt gradient**. Recordings with missing centres are listed and can
+be viewed in **Track region**.
+Rotation uses the centre-to-goal axis for plate-aligned maps. Overlay shading uses the mean
 goal and open circles show individual goals. Salt and bearing calculations use the original
 recording coordinates.
+
+On **Gradient map**, **Reorientation colour → By bearing (Viridis)** colours reorientation
+starts by the bearing just before the turn, from −1 (away from the goal) to +1 (toward it).
+The figure exports include the bearing legend, and the reorientation CSV includes the value
+for each turn.
 
 Two things worth knowing before quoting salt results: ΔC and dC/dt are *differences*, so the assumed
 background concentration cancels exactly, while the percentage-change axis divides by concentration
