@@ -5,7 +5,7 @@ file in a browser, drop in your tracking output, and get reorientation rates, sp
 gradient navigation, roaming/dwelling, MSD and salt-response plots — with the statistics, the figures
 and the raw numbers ready to export.
 
-**[Open the app →](https://anjaliav.github.io/Chemotaxis_Tracks_Analysis_Webapp_v1/)**
+**[Open the app →](https://anjaliav.github.io/Chemotaxis-Analysis-Webapp/)**
 
 Nothing is uploaded anywhere. The whole program is one `index.html` with no libraries and no build
 step; it runs entirely in the browser, works offline, and your data never leaves your computer.
@@ -18,6 +18,7 @@ step; it runs entirely in the browser, works offline, and your data never leaves
 2. In **Data & groups**, create each condition and add its CSV or Excel recordings.
 3. Set the fallback frame rate, select the spatial calibration mode, and enter each recording’s goal
    and plate centre on the same tab. Regression bearing assignment requires a frame rate.
+   Use **Distance axes** to display tracks and distances in pixels.
 4. Open **Tracks** and adjust the turn thresholds until the marks line up with the turns
    you can see.
 
@@ -75,6 +76,8 @@ you the percentage of rows carrying each code and lets you choose which to keep 
 - Roaming and dwelling from log₁₀(speed ÷ angular speed), threshold by Otsu or by hand
 - Mean squared displacement with the log–log exponent α and an effective diffusion coefficient
 - Time course of any of the above in equal time bins
+- Heading distributions on a rose plot, in plate coordinates or relative to the cue, with the
+  resultant vector R, the circular mean and a Rayleigh test
 - A modelled salt gradient, and reorientation rate against concentration, ΔC, dC/dt and % change
 - Tracks and reorientation locations drawn over the modelled gradient field
 
@@ -101,23 +104,7 @@ and the control does not", which is stronger than the two merely differing.
 
 ---
 
-## The salt gradient model
-
-The field is modelled as two-dimensional diffusion of a point bolus in a uniform agar layer.
-
-```
-C(r) = C_background + Σ_drops  1e6 · N / (4·π·h·D·t) · exp( −r² / (4·D·t) )
-
-N = (stock_mM / 1000) · (volume_µL / 1e6)              moles of NaCl in the drop
-h = agar_volume_mL / (π · plate_radius_mm²) · 100      agar height, cm
-D = 1.516e-5 cm²·s⁻¹                                   NaCl, Robinson & Stokes (1951)
-t = seconds since that drop was placed
-```
-
-Nothing in it is fitted to behaviour. Single-Gaussian, exponential and linear-ramp alternatives are
-selectable so a result can be shown not to depend on the shape of the model. The **Methods** tab
-prints the formula, the live JavaScript, and a standalone Python file with your own parameters baked
-in — download it and check the numbers independently.
+## Recording landmarks and maps
 
 Enter each recording’s goal and plate centre in **Data & groups**, in original video pixels.
 Excel files with a `start-end coords` sheet fill the recording start and salt peak automatically.
@@ -129,17 +116,13 @@ Rotation uses the centre-to-goal axis for plate-aligned maps. **One panel per re
 centres each field on that recording’s goal, imported as the **End Point** in Excel. Pooled
 maps centre the field on the mean goal and show individual goals as open circles. The solid
 rim is the plate boundary. The dashed ring marks the worm-placement radius in millimetres.
-Salt and bearing calculations use the original recording coordinates.
+Salt and bearing calculations use the original recording coordinates. Maps use millimetres
+when the plotted recordings have different spatial scales.
 
 On **Gradient map**, **Reorientation colour → By bearing (Viridis)** colours reorientation
 starts by the bearing just before the turn, from −1 (away from the goal) to +1 (toward it).
 The figure exports include the bearing legend, and the reorientation CSV includes the value
 for each turn.
-
-Two things worth knowing before quoting salt results: ΔC and dC/dt are *differences*, so the assumed
-background concentration cancels exactly, while the percentage-change axis divides by concentration
-and inherits it. And concentration is one-to-one with distance from the drop, so a rate-versus-C plot
-is also a map of where the animal was — which is what the no-gradient control is for.
 
 ---
 
@@ -213,8 +196,9 @@ Methods implemented here follow, among others:
 - Collisions and track swaps produce spurious hairpins; the jump filter catches the worst, but tracks
   with many crossings deserve a look.
 - The salt model assumes a laterally infinite, uniformly thick agar layer and an instantaneous point
-  bolus — it is wrong within a few millimetres of the rim and in the first minutes after a drop.
+  bolus, with no plate wall: it underestimates the field near the rim, and the more so the older the
+  gradient. The first minutes after a drop are underestimated too, unless a drop radius is given.
 
 ## Licence
 
-Not yet chosen.
+Not yet chosen — add one before sharing widely (MIT is the usual choice for a tool like this).
