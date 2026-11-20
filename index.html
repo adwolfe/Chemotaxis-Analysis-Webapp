@@ -112,6 +112,7 @@ td.n,th.n{text-align:right;font-variant-numeric:tabular-nums;font-family:var(--m
 .pill{display:inline-block;padding:1px 7px;border-radius:99px;font-size:10.5px;font-weight:600;letter-spacing:.02em}
 .pill.ok{background:rgba(18,122,74,.13);color:var(--good)}
 .pill.no{background:var(--panel-2);color:var(--ink-3);border:1px solid var(--line)}
+.pill.warn{background:var(--panel-2);color:var(--warn);border:1px solid currentColor}
 .note{font-size:12px;color:var(--ink-2);background:var(--panel-2);border-left:3px solid var(--line-2);padding:9px 12px;border-radius:0 7px 7px 0;margin:10px 0}
 .note.warn{border-left-color:var(--warn)}
 .mono{font-family:var(--mono);font-size:12px}
@@ -183,11 +184,16 @@ td.n,th.n{text-align:right;font-variant-numeric:tabular-nums;font-family:var(--m
       <h3>Calibration</h3>
       <div class="grid g3">
         <div>
-          <label class="f">Frame rate <span class="hint">frames / s</span></label>
-          <input type="number" id="fps" placeholder="leave blank → use frames" step="any" min="0">
+          <label class="f">Fallback frame rate <span class="hint">frames / s</span></label>
+          <input type="number" id="fps" placeholder="for recordings without a rate" step="any" min="0">
         </div>
         <div>
-          <label class="f">Spatial scale <span class="hint">pixels / mm</span></label>
+          <label class="f" for="scaleMode">Spatial calibration</label>
+          <select id="scaleMode">
+            <option value="shared">Use shared scale</option>
+            <option value="recording">Use each recording’s reported scale</option>
+          </select>
+          <label class="f" for="pxmm"><span id="scaleInputLabel">Shared scale</span> <span class="hint">pixels / mm</span></label>
           <input type="number" id="pxmm" placeholder="automatic when available" step="any" min="0">
           <button class="btn sm" id="autoScaleBtn" type="button">Use automatic scale</button>
         </div>
@@ -249,7 +255,7 @@ td.n,th.n{text-align:right;font-variant-numeric:tabular-nums;font-family:var(--m
       <div class="row">
         <label class="chk"><input type="checkbox" id="alignCue" checked> Rotate each recording so the goal lies to the left on the x-axis</label>
       </div>
-      <div class="note">Excel files with a start-end coords sheet fill in the start and goal automatically. Coordinates are in original video pixels. Tracks can rotate around the start-to-goal axis. Full-plate maps use the centre-to-goal axis.</div>
+      <div class="note">A blank FPS override uses the file rate, then the fallback above. Reported pixel scales are flagged if they differ from the median by more than 5 px/mm. Excel landmarks are in original video pixels.</div>
       <div class="scroll" id="srcTable"></div>
       <div id="landmarkPicker"></div>
       <details style="margin-top:10px"><summary>Shared centre for recordings without a centre</summary>
@@ -748,7 +754,7 @@ td.n,th.n{text-align:right;font-variant-numeric:tabular-nums;font-family:var(--m
       </div>
       <div class="row" style="margin-top:10px;border-top:1px solid var(--line);padding-top:10px">
         <span style="font-size:12px;color:var(--ink-3)">y-axis:</span>
-        <div style="width:150px;flex:0 0 150px"><label class="f">Frame rate <span class="hint">fps</span></label>
+        <div style="width:150px;flex:0 0 150px"><label class="f">Fallback frame rate <span class="hint">fps</span></label>
           <input type="number" id="saltFps" step="any" min="0" placeholder="not set"></div>
         <div style="width:190px;flex:0 0 190px"><label class="f">Rate expressed</label>
           <select id="saltRateUnit">
@@ -814,8 +820,9 @@ td.n,th.n{text-align:right;font-variant-numeric:tabular-nums;font-family:var(--m
       <div class="row">
         <div style="min-width:200px"><label class="f">Layout</label>
           <select id="gmLayout">
-            <option value="cond">One panel per condition</option>
-            <option value="overlay">All conditions on one panel</option>
+            <option value="recording">One panel per recording</option>
+            <option value="cond">One panel per condition (mean goal)</option>
+            <option value="overlay">All conditions on one panel (mean goal)</option>
             <option value="worm">One panel per worm</option>
           </select></div>
         <div style="min-width:155px"><label class="f" for="gmExtent">Map extent</label>
@@ -858,9 +865,9 @@ td.n,th.n{text-align:right;font-variant-numeric:tabular-nums;font-family:var(--m
             <option value="condition">By condition</option>
             <option value="bearing">By bearing (Viridis)</option>
           </select></label>
-        <label class="chk"><input type="checkbox" id="gmRing"> Plate outline and worm ring</label>
+        <label class="chk"><input type="checkbox" id="gmRing"> Show worm-placement ring</label>
       </div>
-      <div class="note">Set recording centres in Data &amp; groups and the plate diameter in Salt gradient.</div>
+      <div class="note" id="gmGeometryNote">The solid rim shows the plate boundary. The dashed ring marks the worm placement radius. Set the diameter and placement radius in Salt gradient.</div>
     </div>
     <div id="gmFigs"><div class="empty">Load data first.</div></div>
     <div class="card"><h3>Salt experienced, per replicate</h3><div class="scroll" id="gmTable"></div></div>
@@ -934,7 +941,7 @@ td.n,th.n{text-align:right;font-variant-numeric:tabular-nums;font-family:var(--m
           <label class="f">Bars behind the points</label>
           <select id="barsOn"><option value="yes">Show bars</option><option value="no" selected>Points and error bars only</option></select>
         </div>
-        <label class="chk"><input type="checkbox" id="wormOverlay" checked> Show individual worms behind plate summaries for runs, distance and reorientations</label>
+        <label class="chk"><input type="checkbox" id="wormOverlay" checked> Show individual worms behind plate summaries for runs, distance, reorientations and bearing slopes</label>
         <div>
           <label class="f">Y axis on comparison plots</label>
           <select id="yAxisMode">
@@ -1338,8 +1345,8 @@ function coverFig() {
   line('Conditions', ST.conds.map(cd => cd.name + (cd.grad === 'no' ? ' (no gradient)' : '')).join(', ') || '—');
   if (A) line('Worms analysed', A.rows.length);
   line('Replicate unit', c.nUnit === 'file' ? 'plate / file' : 'individual worm');
-  line('Frame rate', c.fps ? c.fps + ' fps' : 'not set — time in frames');
-  line('Spatial scale', c.pxmm ? c.pxmm + ' px/mm' : 'not set — distance in pixels');
+  line('Frame rates', frameRateSummary(c));
+  line('Spatial scale', spatialScaleSummary(c));
   line('Primary method', c.primary);
   line('Smoothing', c.smoothMethod === 'sg' ? `Savitzky-Golay, window ${c.smoothWin}, order ${c.sgOrder}`
     : c.smoothMethod === 'none' ? 'none' : `moving average, window ${c.smoothWin}`);
@@ -1536,15 +1543,25 @@ function parseCSV(text) { const out = []; let row = [], cur = '', q = false;
    ========================================================================== */
 const ST = { conds: [], nextId: 1, qualCodes: new Set(), qualOn: new Set(), analysis: null, figs: {}, tables: {} };
 
+function recordingFrameRate(f, fallback) {
+  return [f.fps, f.meta?.fps, fallback].find(v => Number.isFinite(v) && v > 0) ?? null;
+}
+function frameRateSummary(c) {
+  const rates = c.frameRates.length ? c.frameRates : c.fps ? [c.fps] : [];
+  return rates.length ? rates.join(', ') + ' fps' : 'time in frames';
+}
 function cfg() {
   const num = (id, d) => { const v = parseFloat($(id).value); return isFinite(v) ? v : d; };
   const raw = (id) => { const v = parseFloat($(id).value); return isFinite(v) && v > 0 ? v : null; };
-  const fps = raw('fps'), pxmm = raw('pxmm');
+  const fps = raw('fps'), pxmm = raw('pxmm'), scaleMode = $('scaleMode').value;
+  const frameRates = [...new Set(ST.conds.flatMap(cd => cd.files.map(f => recordingFrameRate(f, fps))).filter(Boolean))]
+    .sort((a, b) => a - b);
+  const hasTime = Boolean(fps || frameRates.length);
+  const hasSpace = Boolean(pxmm || (scaleMode === 'recording' && reportedScales(ST.conds).length));
   return {
-    fps, pxmm,
-    hasTime: !!fps, hasSpace: !!pxmm,
-    F: fps || 1, K: pxmm || 1,
-    tUnit: fps ? 's' : 'frames', sUnit: pxmm ? 'mm' : 'px',
+    fps, frameRates, pxmm, scaleMode,
+    hasTime, hasSpace,
+    tUnit: hasTime ? 's' : 'frames', sUnit: hasSpace ? 'mm' : 'px',
     rateUnit: $('rateUnit').value,
     smoothWin: Math.max(1, Math.round(num('smoothWin', 5))),
     smoothMethod: $('smoothMethod') ? $('smoothMethod').value : 'ma',
@@ -1862,7 +1879,7 @@ function analyzeWorm(w, c) {
 
   const R = resample(sm, c);
   const { ts, xs, ys } = R, n = ts.length;
-  const dt = c.dt;
+  const dt = Math.max(c.dt, 1 / c.F);
   const minD = c.minDisp / c.K;
 
   // displacement + heading per interval i (from sample i to i+1)
@@ -1900,7 +1917,7 @@ function analyzeWorm(w, c) {
   /* ---------- Method C: posture-based reversals + omega turns (needs centerlines) ---------- */
   let evC = [], nRev = 0, nOmega = 0, bendRatio = null;
   if (c.useC && w.cl && w.cl.f.length > 5) {
-    const CL = w.cl, tolF = Math.max(1, c.dt * c.F);
+    const CL = w.cl, tolF = R.stepF;
     const axisAt = fr => { let lo = 0, hi = CL.f.length - 1;
       while (lo < hi) { const mid = (lo + hi) >> 1; if (CL.f[mid] < fr) lo = mid + 1; else hi = mid; }
       let best = lo;
@@ -2067,7 +2084,7 @@ function plateBearingRates(worms, rateCfg) {
       ws.forEach(w => { const b = w.nav.rateBins[k]; time += b.time; n += b.n; });
       return { x0, x1, mid, time, n, mean: rateOf(n, time, rateCfg) };
     });
-    return { fileId, file, bins, fit: fitBearingBins(bins), wormCount: ws.length };
+    return { fileId, file, bins, fit: fitBearingBins(bins), worms: ws };
   });
 }
 function linFit(x, y) {
@@ -2164,7 +2181,7 @@ function addSalt(w, c, sc, geom) {
   const C = new Array(n).fill(null), r = new Array(n).fill(null);
   for (let i = 0; i < n; i++) { if (w.xs[i] == null) continue;
     const dmm = Math.hypot(w.xs[i] - geom.x, w.ys[i] - geom.y);
-    r[i] = dmm; C[i] = saltAt(dmm / 10, sc, sc.live ? (w.ts[i] - t0) : 0); }
+    r[i] = dmm; C[i] = saltAt(dmm / 10, sc, sc.live && c.hasTime ? (w.ts[i] - t0) : 0); }
   const step = Math.max(1, Math.round(sc.win / dt));
   const d1 = new Array(n).fill(null), dC = new Array(n).fill(null),
     dCdt = new Array(n).fill(null), pct = new Array(n).fill(null);
@@ -2359,11 +2376,21 @@ function runAnalysis() {
   const c = cfg(), sc = saltCfg();
   const conds = ST.conds.map(cd => {
     const worms = [];
-    cd.files.forEach(f => f.worms.forEach(w => {
-      const r = analyzeWorm(w, c);
-      r.cond = cd.name; r.condId = cd.id; r.file = f.name; r.fileId = f.id; r.color = cd.color;
-      if (r.ok) { const g = geomFor(f, cd, c); addNav(r, c, g); addStates(r, c); addMSD(r, c); addSalt(r, c, sc, g); }
-      worms.push(r); }));
+    cd.files.forEach(f => {
+      const fps = recordingFrameRate(f, c.fps);
+      const scale = recordingScale(f, c);
+      const fileConfig = { ...c, F: fps || 1, K: scale || 1 };
+      const missing = [c.hasTime && !fps ? 'frame rate' : '', c.hasSpace && !scale ? 'scale' : ''].filter(Boolean);
+      f.worms.forEach(w => {
+        const r = missing.length ? { id: w.id, ok: false, reason: 'missing ' + missing.join(' and ') } : analyzeWorm(w, fileConfig);
+        r.cond = cd.name; r.condId = cd.id; r.file = f.name; r.fileId = f.id; r.color = cd.color; r.fps = fps; r.scale = scale;
+        if (r.ok) {
+          const geometry = geomFor(f, cd, fileConfig);
+          addNav(r, fileConfig, geometry); addStates(r, fileConfig); addMSD(r, fileConfig); addSalt(r, fileConfig, sc, geometry);
+        }
+        worms.push(r);
+      });
+    });
     return { ...cd, worms, used: worms.filter(w => w.ok) };
   });
   const rows = [];
@@ -2730,14 +2757,7 @@ function rampColor(name, u) {
    the contrast where the animals actually are; "linear" reproduces the notebook. */
 function saltScaleFns(mode, lo, hi) {
   if (mode === 'linear' || !(lo > 0)) return { g: v => v, gi: v => v, lo, hi };
-  return { g: v => Math.log10(Math.max(v, 1e-9)), gi: v => Math.pow(10, v), lo, hi };
-}
-function saltTicks(mode, lo, hi) {
-  if (mode === 'linear') return niceTicks(lo, hi, 5);
-  const out = [];
-  for (let e = -4; e <= 5; e++) [1, 2, 5].forEach(m => { const v = m * Math.pow(10, e);
-    if (v > lo * 1.02 && v < hi * .98) out.push(v); });
-  return out.length >= 2 ? out : niceTicks(lo, hi, 5);
+  return { g: Math.log10, gi: v => Math.pow(10, v), lo, hi };
 }
 
 function strokeArcInBox(fig, cx, cy, r, B, style) {
@@ -2787,20 +2807,23 @@ function fieldTrackFig(title, tracks, dom, opt) {
     cHi = saltAt(rNear / 10, sc, tAdd); cLo = saltAt(rFar / 10, sc, tAdd);
     if (cHi > cLo) T = saltScaleFns(opt.scale || 'log', cLo, cHi);
   }
-  const nb = sc.bands, ramp = opt.rampName || 'grey';
+  const nb = clamp(sc.bands, 3, 40), ramp = opt.rampName || 'grey';
   const ink = CONTOUR_INK[ramp] || CONTOUR_INK.grey;
-  const bandAt = k => T ? T.gi(T.g(cLo) + (T.g(cHi) - T.g(cLo)) * k / nb) : 0;
+  const edges = T ? Array.from({ length: nb + 1 }, (_, k) =>
+    k === 0 ? cLo : k === nb ? cHi : T.gi(T.g(cLo) + (T.g(cHi) - T.g(cLo)) * k / nb)) : [];
+  const boundaries = edges.slice(1, -1).map(value => ({
+    value, radius: saltRadiusAt(value, sc, tAdd, rFar / 10 * 1.05) * 10
+  }));
   if (T && ramp !== 'none') {
     fig.rect(B.x0, B.y0, bw, bh, { fill: rampColor(ramp, .5 / nb) });
-    for (let k = 1; k < nb; k++) {
-      const rr = saltRadiusAt(bandAt(k), sc, tAdd, rFar / 10 * 1.05) * 10;
-      if (!(rr > 0)) continue;
+    boundaries.forEach(({ radius: rr }, i) => {
+      if (!(rr > 0)) return;
       const poly = [];
       for (let a = 0; a < 96; a++) { const th = a * 2 * Math.PI / 96;
         poly.push([sx(src.x + rr * Math.cos(th)), sy(src.y + rr * Math.sin(th))]); }
       const scr = clipPolyRect(poly, B.x0, B.y0, B.x1, B.y1);
-      if (scr.length > 2) fig.poly(scr.concat([scr[0]]), { fill: rampColor(ramp, (k + .5) / nb) });
-    }
+      if (scr.length > 2) fig.poly(scr.concat([scr[0]]), { fill: rampColor(ramp, (i + 1.5) / nb) });
+    });
   }
 
   if (!full) frame(fig, B, xd, yd, { grid: opt.grid === true, flipY: opt.flipY,
@@ -2809,14 +2832,15 @@ function fieldTrackFig(title, tracks, dom, opt) {
   /* --- contour rings, labelled in mM --- */
   if (T && opt.contour !== false) {
     const placedLab = [];          // a contour label is skipped rather than stacked on another
-    saltTicks(opt.scale || 'log', cLo, cHi).forEach(v => {
-      const rr = saltRadiusAt(v, sc, tAdd, rFar / 10 * 1.05) * 10;
+    boundaries.forEach(({ value, radius: rr }) => {
       if (!(rr > 0)) return;
       const segs = strokeArcInBox(fig, sx(src.x), sy(src.y), Math.abs(sx(src.x + rr) - sx(src.x)), B,
         { stroke: ink, sw: .75, op: .8 });
       if (opt.labels !== false && segs.length) {
-        const cand = [[src.x, src.y - rr], [src.x, src.y + rr], [src.x + rr, src.y], [src.x - rr, src.y]];
-        const t = fmt(v, 3), tw = txtWidth(t, 8.5);
+        const d = rr * Math.SQRT1_2;
+        const cand = [[src.x, src.y - rr], [src.x, src.y + rr], [src.x + rr, src.y], [src.x - rr, src.y],
+          [src.x + d, src.y - d], [src.x - d, src.y - d], [src.x + d, src.y + d], [src.x - d, src.y + d]];
+        const t = fmt(value, 3), tw = txtWidth(t, 8.5);
         for (const q of cand) { const X = sx(q[0]), Y = sy(q[1]) - 3;
           if (!(X > B.x0 + 18 && X < B.x1 - 18 && Y > B.y0 + 13 && Y < B.y1 - 5)) continue;
           if (full && Math.hypot(X - sx(plate.cx), Y - sy(plate.cy)) + tw / 2 + 8 > bw / 2) continue;
@@ -2833,7 +2857,7 @@ function fieldTrackFig(title, tracks, dom, opt) {
     const { cx, cy, dia, ring } = plate;
     const pixels = length => Math.abs(sx(cx + length) - sx(cx));
     if (!full) strokeArcInBox(fig, sx(cx), sy(cy), pixels(dia / 2), B, { stroke: INK.axis, sw: 1.1, op: .85 });
-    if (ring > 0) strokeArcInBox(fig, sx(cx), sy(cy), pixels(ring), B, { stroke: '#d1495b', sw: 1, dash: '5,4', op: .85 });
+    if (ring > 0) strokeArcInBox(fig, sx(cx), sy(cy), pixels(ring), B, { stroke: '#a16b16', sw: 1, dash: '5,4', op: .9 });
   }
 
   /* --- tracks, each with a white casing so they read over the shading --- */
@@ -2868,15 +2892,16 @@ function fieldTrackFig(title, tracks, dom, opt) {
 
   /* --- colour bar, spaced the same way as the bands --- */
   if (cbarOn && T && ramp !== 'none') {
-    const bx = B.x1 + 20, bwd = 13, y0 = B.y0 + 4, y1 = B.y1 - 4, steps = 72;
-    for (let k = 0; k < steps; k++) { const u = k / (steps - 1);
-      const yy = y1 - (y1 - y0) * (k + 1) / steps;
-      fig.rect(bx, yy, bwd, (y1 - y0) / steps + .7, { fill: rampColor(ramp, u) }); }
+    const bx = B.x1 + 20, bwd = 13, y0 = B.y0 + 4, y1 = B.y1 - 4, height = (y1 - y0) / nb;
+    for (let k = 0; k < nb; k++) {
+      fig.rect(bx, y1 - height * (k + 1), bwd, height + .2, { fill: rampColor(ramp, (k + .5) / nb) }); }
     fig.rect(bx, y0, bwd, y1 - y0, { stroke: INK.axis, sw: .8 });
-    const g0 = T.g(cLo), g1 = T.g(cHi);
-    [cLo, ...saltTicks(opt.scale || 'log', cLo, cHi), cHi].forEach(v => {
-      const yy = y1 - (T.g(v) - g0) / (g1 - g0) * (y1 - y0);
+    let lastLabelY = Infinity;
+    edges.forEach((v, k) => {
+      const yy = y1 - height * k;
       fig.line(bx + bwd, yy, bx + bwd + 3, yy, { stroke: INK.axis, sw: .8 });
+      if (k > 0 && k < nb && (lastLabelY - yy < 14 || yy - y0 < 14)) return;
+      lastLabelY = yy;
       fig.text(bx + bwd + 5, yy + 3.2, fmt(v, 3), { size: 9, fill: INK.tick }); });
     fig.text(bx + 1, y0 - 7, 'mM', { size: 9, fill: INK.tick });
   }
@@ -3451,38 +3476,56 @@ async function loadFiles(cd, files) {
   if (!ST.qualOn.size) defaultQual();
   renderQual(); renderConds(); schedule();
 }
-/* Fill in frame rate from the workbook or worm_summary.json. */
-let AUTO_NOTE = '';
+/* Choose a starting smoothing window when the loaded recordings share a rate. */
 function autoCalibrate() {
   if (RESTORING) return;
-  const metas = ST.conds.flatMap(c => c.files.map(f => f.meta || {}));
-  const fps = [...new Set(metas.map(m => m.fps).filter(v => isFinite(v) && v > 0))];
-  const notes = [];
-  if (fps.length && !$('fps').value) { $('fps').value = +fps[0].toFixed(6);
-    notes.push(`frame rate set to <b>${+fps[0].toFixed(4)} fps</b> from the file`); }
-  if (fps.length && !TOUCHED.has('smoothWin')) {                     // ~0.5 s of smoothing, whatever the frame rate
-    let w = Math.round(fps[0] * .5); w = Math.max(3, Math.min(61, w % 2 ? w : w + 1));
-    const ord = parseInt($('sgOrder').value, 10) || 2;
-    if ($('smoothMethod').value === 'sg' && w < ord + 2) w = ord + 3 - ((ord + 3) % 2 ? 0 : 1);
-    if (String(w) !== $('smoothWin').value) { $('smoothWin').value = w;
-      notes.push(`smoothing window set to <b>${w} frames</b> (≈0.5 s at this frame rate)`); } }
-  if (fps.length > 1) notes.push(`<b>warning:</b> the loaded files report different frame rates (${fps.map(v => +v.toFixed(3)).join(', ')})`);
-  AUTO_NOTE = notes.length ? '<div class="note">Auto-detected: ' + notes.join('; ') + '. Change either box to override.</div>' : '';
+  const { frameRates } = cfg();
+  if (frameRates.length !== 1 || TOUCHED.has('smoothWin')) return;
+  let w = Math.round(frameRates[0] * .5);
+  w = Math.max(3, Math.min(61, w % 2 ? w : w + 1));
+  const ord = parseInt($('sgOrder').value, 10) || 2;
+  if ($('smoothMethod').value === 'sg' && w < ord + 2) w = ord + 3 - ((ord + 3) % 2 ? 0 : 1);
+  $('smoothWin').value = w;
+}
+const SCALE_TOLERANCE = 5;
+function reportedScale(f) {
+  const scale = f.meta?.pxmm;
+  return Number.isFinite(scale) && scale > 0 ? scale : null;
+}
+function reportedScales(conditions) {
+  return conditions.flatMap(cd => cd.files.map(reportedScale)).filter(v => v !== null);
+}
+function recordingScale(f, c) {
+  return c.scaleMode === 'recording' ? reportedScale(f) ?? c.pxmm : c.pxmm;
+}
+function spatialScaleSummary(c) {
+  if (!c.hasSpace) return 'distance in pixels';
+  if (c.scaleMode === 'shared') return `${c.pxmm} px/mm shared`;
+  return c.pxmm ? `per recording with a ${c.pxmm} px/mm fallback` : 'per recording';
 }
 function updateSpatialScale() {
-  const scales = ST.conds.flatMap(cd => cd.files.map(f => f.meta?.pxmm))
-    .filter(v => Number.isFinite(v) && v > 0);
+  const scales = reportedScales(ST.conds);
   const manual = TOUCHED.has('pxmm');
+  const perRecording = $('scaleMode').value === 'recording';
+  $('scaleInputLabel').textContent = perRecording ? 'Fallback scale' : 'Shared scale';
+  $('pxmm').placeholder = perRecording ? 'for files without a scale' : 'automatic when available';
+  $('autoScaleBtn').textContent = perRecording ? 'Clear fallback scale' : 'Use automatic scale';
+  $('autoScaleBtn').disabled = !manual;
+  const note = $('scaleNote');
+  if (perRecording) {
+    if (!manual) $('pxmm').value = '';
+    note.textContent = 'Each recording uses its reported scale. The fallback applies to recordings without scale metadata.';
+    return;
+  }
   const lo = minOf(scales), hi = maxOf(scales);
-  const compatible = scales.length > 0 && hi - lo <= 5 + 1e-9;
+  const compatible = scales.length > 0 && hi - lo <= SCALE_TOLERANCE + 1e-9;
   // Average the physical pixel sizes before converting to the app's display units.
   const meanSize = compatible ? S.mean(scales.map(v => 1000 / v)) : NaN;
   if (!manual) $('pxmm').value = compatible ? +(1000 / meanSize).toFixed(6) : '';
-  $('autoScaleBtn').disabled = !manual;
-  const note = $('scaleNote');
-  if (manual) note.textContent = 'Manual scale in use. Select Use automatic scale to average the file measurements.';
+  if (manual) note.textContent = 'Manual scale in use.' + (scales.length && !compatible
+    ? ` Reported scales span ${fmt(lo, 3)} to ${fmt(hi, 3)} px/mm.` : '');
   else if (compatible) note.textContent = `Shared scale from ${scales.length} calibrated recording${scales.length === 1 ? '' : 's'} across all conditions. Mean pixel size ${fmt(meanSize, 4)} µm/pixel.`;
-  else if (scales.length) note.textContent = `File scales span ${fmt(lo, 3)} to ${fmt(hi, 3)} px/mm. The limit for automatic averaging is a 5 px/mm spread. Enter a shared scale to analyze distances in millimetres.`;
+  else if (scales.length) note.textContent = `File scales span ${fmt(lo, 3)} to ${fmt(hi, 3)} px/mm. The limit for automatic averaging is a ${SCALE_TOLERANCE} px/mm spread. Enter a shared scale to analyze distances in millimetres.`;
   else note.textContent = 'Enter pixels per mm or load a recording with pixel-size metadata.';
 }
 $('autoScaleBtn').onclick = () => { TOUCHED.delete('pxmm'); schedule(); };
@@ -3551,7 +3594,7 @@ function renderChips(A) {
 }
 
 /* ---- inputs ---- */
-const WATCH = ['fps','pxmm','rateUnit','smoothWin','smoothMethod','sgOrder','dt','minDisp','omegaThr','tcrit','methodACount','angThr','angWin','refrac',
+const WATCH = ['fps','pxmm','scaleMode','rateUnit','smoothWin','smoothMethod','sgOrder','dt','minDisp','omegaThr','tcrit','methodACount','angThr','angWin','refrac',
  'primary','nUnit','errBar','barsOn','wormOverlay','yAxisMode','maxStep','minFrames','minPath','dropZero','axAuto','axEqual','axFlipY','axOrigin',
  'axXmin','axXmax','axYmin','axYmax','trkLayout','trkMark','trkSize','trkColor','trkStart','trkEnd',
  'trkLW','trkOp','trkScale','trkGrid','spdMeasure','distMeasure','showEff','iriStat','iriDist','iriCensor','iriSpeed',
@@ -3573,7 +3616,7 @@ WATCH.forEach(id => { const n = $(id); if (!n) return;
     () => {
       TOUCHED.add(id);
       if (id.startsWith('mk') || id === 'trkStart' || id === 'trkEnd') refreshSwatches();
-      if (['gmExtent', 'saltCx', 'saltCy', 'saltPlateDia', 'alignCue', 'axOrigin'].includes(id)) {
+      if (['gmExtent', 'saltCx', 'saltCy', 'saltPlateDia', 'alignCue', 'axOrigin', 'scaleMode', 'pxmm'].includes(id)) {
         Object.keys(ST.zoom).filter(key => /^(track_|gradient_map_|reorientations_on_field_)/.test(key))
           .forEach(key => delete ST.zoom[key]);
       }
@@ -3612,11 +3655,13 @@ function wideFromGroups(name, groups) {           // one column per condition, o
   for (let i = 0; i < maxN; i++) rows.push(g.map(x => x.values[i] == null || !isFinite(x.values[i]) ? '' : x.values[i]));
   return { name, rows };
 }
-function metricReplicateTable(name, plates, ylab, timeUnit) {
-  const rows = [['Condition', 'Plate file', 'Plate ID', 'Worm ID', 'Unit', ylab, `Track duration (${timeUnit})`, 'Worms contributing']];
+function metricReplicateTable(name, plates, ylab, timeUnit, extraColumns = []) {
+  const rows = [['Condition', 'Plate file', 'Plate ID', 'Worm ID', 'Unit', ylab, `Track duration (${timeUnit})`, 'Worms contributing',
+    ...extraColumns.map(([label]) => label)]];
+  const extra = entry => extraColumns.map(([, value]) => value(entry));
   plates.forEach(g => g.entries.forEach(p => {
-    rows.push([g.name, p.file, p.fileId, '', 'Plate', p.value, '', p.worms.length]);
-    p.worms.forEach(w => rows.push([g.name, p.file, p.fileId, w.worm, 'Worm', w.value, w.dur, '']));
+    rows.push([g.name, p.file, p.fileId, '', 'Plate', p.value, '', p.worms.length, ...extra(p)]);
+    p.worms.forEach(w => rows.push([g.name, p.file, p.fileId, w.worm, 'Worm', w.value, w.dur, '', ...extra(w)]));
   }));
   return { name, rows };
 }
@@ -3678,6 +3723,11 @@ function wideFromValueGroups(name, groups) {      // pooled distributions, one c
 /* ---- figure card: view zoom (pan + magnify) and, on track panels, box zoom of the axes ---- */
 ST.zoom = ST.zoom || {};
 ST.figWide = ST.figWide || {};
+function figureCsvButton({ name, rows }, label) {
+  return el('button', { class: 'btn sm',
+    onclick: () => saveBlob(new Blob([toCSV(rows)], { type: 'text/csv' }), safeName(name) + '.csv') }, label);
+}
+
 function figCard(key, fig, subtitle, opt = {}) {
   if (!opt.pickPoint) ST.figs[key] = fig;
   const srcWide = opt.wide != null ? opt.wide : fig.wideData;
@@ -3771,11 +3821,7 @@ function figCard(key, fig, subtitle, opt = {}) {
       const enc = t => new TextEncoder().encode(t);
       saveBlob(makeZip(wides.map(w => ({ name: safeName(w.name) + '.csv', data: enc(toCSV(w.rows)) }))),
         safeName(fig.title) + '_data.zip'); } }, 'CSV'));
-  if (opt.csv) {
-    const { name, rows } = opt.csv;
-    bar.appendChild(el('button', { class: 'btn sm',
-      onclick: () => saveBlob(new Blob([toCSV(rows)], { type: 'text/csv' }), safeName(name) + '.csv') }, opt.csvLabel));
-  }
+  if (opt.csv) bar.appendChild(figureCsvButton(opt.csv, opt.csvLabel));
   [['SVG', () => saveBlob(figSVGBlob(fig), safeName(fig.title) + '.svg')],
    ['PNG', async () => { const b = await figPNGBlob(fig); if (b) saveBlob(b, safeName(fig.title) + '.png'); }],
    ['PDF', () => saveBlob(figPDFBlob(fig), safeName(fig.title) + '.pdf')]]
@@ -3786,10 +3832,13 @@ function figCard(key, fig, subtitle, opt = {}) {
 }
 
 function setSourceFor(condId, dx, dy) {
-  const K = cfg().K;
-  const px = { x: +(dx * K).toFixed(2), y: +(dy * K).toFixed(2) };
+  const c = cfg();
   const targets = condId ? ST.conds.filter(c2 => c2.id === condId) : ST.conds;
-  targets.forEach(c2 => c2.files.forEach(f => f.src = { ...px }));
+  targets.forEach(c2 => c2.files.forEach(f => {
+    const scale = recordingScale(f, c);
+    if (c.hasSpace && !scale) return;
+    f.src = { x: +(dx * (scale || 1)).toFixed(2), y: +(dy * (scale || 1)).toFixed(2) };
+  }));
   const st = $('srcTable'); if (st) st.dataset.sig = '';
   PICKSRC.on = false;
   schedule();
@@ -3872,9 +3921,12 @@ function renderAll() {
   updateSpatialScale();
   const c = cfg();
   ST.figs = {}; ST.tables = {}; ST.figWide = {};
-  $('unitNote').innerHTML = `Time is reported in <b>${c.tUnit}</b>${c.hasTime ? ` (${c.fps} fps)` : ' — enter a frame rate to convert to seconds'}; ` +
-    `distance in <b>${c.sUnit}</b>${c.hasSpace ? ` (${c.pxmm} px/mm)` : ' — enter pixels per mm to convert to millimetres'}. ` +
-    `Every threshold below that has a time unit is expressed per <b>${c.tUnit === 's' ? 'second' : 'frame'}</b>.` + (AUTO_NOTE || '');
+  const missingFPS = c.hasTime ? ST.conds.flatMap(cd => cd.files).filter(f => !recordingFrameRate(f, c.fps)) : [];
+  const missingScale = c.hasSpace ? ST.conds.flatMap(cd => cd.files).filter(f => !recordingScale(f, c)) : [];
+  $('unitNote').textContent = (c.hasTime ? `Time in seconds (${frameRateSummary(c)}). ` : 'Time in frames. ') +
+    (c.hasSpace ? `Distance in millimetres (${spatialScaleSummary(c)}). ` : 'Distance in pixels. ') +
+    (missingFPS.length ? `Excluded until a frame rate is entered: ${missingFPS.map(f => f.name).join(', ')}. ` : '') +
+    (missingScale.length ? `Excluded until a spatial scale is available: ${missingScale.map(f => f.name).join(', ')}.` : '');
   $('dtUnit').textContent = c.tUnit;
   $('sgOrderBox').style.visibility = c.smoothMethod === 'sg' ? '' : 'hidden';
   $('navDirBox').style.display = c.navMode === 'dir' ? '' : 'none';
@@ -3900,8 +3952,9 @@ function renderAll() {
   const A = runAnalysis();
   renderSrcTable(A);
   ST.tables.recording_landmarks = { name: 'recording_landmarks', rows: [
-    ['Condition', 'Recording', 'Start x (px)', 'Start y (px)', 'Goal x (px)', 'Goal y (px)', 'Recorded centre x (px)', 'Recorded centre y (px)'],
-    ...A.conds.flatMap(cd => cd.files.map(f => [cd.name, f.name, f.start?.x, f.start?.y, f.src?.x, f.src?.y, f.centre?.x, f.centre?.y]))
+    ['Condition', 'Recording', 'Start x (px)', 'Start y (px)', 'Goal x (px)', 'Goal y (px)', 'Recorded centre x (px)', 'Recorded centre y (px)', 'Effective FPS', 'Reported scale (px/mm)', 'Effective scale (px/mm)'],
+    ...A.conds.flatMap(cd => cd.files.map(f => [cd.name, f.name, f.start?.x, f.start?.y, f.src?.x, f.src?.y,
+      f.centre?.x, f.centre?.y, recordingFrameRate(f, c.fps), reportedScale(f), recordingScale(f, c)]))
   ] };
   if (!TOUCHED.has('tcBin')) { const md = maxOf(A.rows.map(r => r.dur).filter(isFinite));
     if (isFinite(md) && md > 0) { const raw = md / 10;
@@ -3965,34 +4018,35 @@ function robustThr(vals, k) { const v = vals.filter(isFinite); if (v.length < 10
   const raw = med + k * (mad / 0.6745);
   return clamp(raw, S.quantile(v, .80), S.quantile(v, .995)); }
 
-function persistenceAt(A, L) { let s = 0, k = 0; L = Math.max(1, Math.round(L));
-  A.conds.forEach(cd => cd.used.forEach(w => { const X = w.sm.x, Y = w.sm.y, n = X.length;
-    for (let i = 0; i + 2 * L < n; i += Math.max(1, Math.round(L / 2))) {
-      const ax = X[i + L] - X[i], ay = Y[i + L] - Y[i], bx = X[i + 2 * L] - X[i + L], by = Y[i + 2 * L] - Y[i + L];
+function persistenceAt(worms, interval) {
+  let sum = 0, count = 0;
+  worms.forEach(w => {
+    const lag = Math.max(1, Math.round(interval * (w.fps || 1)));
+    const X = w.sm.x, Y = w.sm.y;
+    for (let i = 0; i + 2 * lag < X.length; i += Math.max(1, Math.round(lag / 2))) {
+      const ax = X[i + lag] - X[i], ay = Y[i + lag] - Y[i];
+      const bx = X[i + 2 * lag] - X[i + lag], by = Y[i + 2 * lag] - Y[i + lag];
       const na = Math.hypot(ax, ay), nb = Math.hypot(bx, by);
       if (na < 1e-9 || nb < 1e-9) continue;
-      s += (ax * bx + ay * by) / (na * nb); k++; } }));
-  return k ? s / k : NaN; }
+      sum += (ax * bx + ay * by) / (na * nb);
+      count++;
+    }
+  });
+  return count ? sum / count : NaN;
+}
 
-/* directional persistence: <cos Δθ> as a function of lag — tells you what Δt is meaningful */
+/* Sample the diagnostic at shared times and convert each lag to frames per recording. */
 function persistenceFig(A) {
-  const c = A.c;
-  const KEEP = {};
-  const lags = [];
-  for (let k = -4; k <= 8; k++) lags.push(Math.max(1, Math.round(c.dt * c.F * Math.pow(2, k / 2))));
-  const uniq = [...new Set(lags)].sort((a, b) => a - b);
-  const series = KEEP.series = A.conds.map(cd => ({ name: cd.name, color: cd.color, pts: uniq.map(L => {
-    let s = 0, k = 0;
-    cd.used.forEach(w => { const X = w.sm.x, Y = w.sm.y, n = X.length;
-      for (let i = 0; i + 2 * L < n; i += Math.max(1, Math.round(L / 2))) {
-        const ax = X[i + L] - X[i], ay = Y[i + L] - Y[i], bx = X[i + 2 * L] - X[i + L], by = Y[i + 2 * L] - Y[i + L];
-        const na = Math.hypot(ax, ay), nb = Math.hypot(bx, by);
-        if (na < 1e-9 || nb < 1e-9) continue;
-        s += (ax * bx + ay * by) / (na * nb); k++; } });
-    return [L / c.F, k ? s / k : NaN]; }).filter(p => isFinite(p[1])) })).filter(s => s.pts.length);
+  const c = A.c, slowest = c.frameRates[0] || 1;
+  const lags = new Set();
+  for (let k = -4; k <= 8; k++) lags.add(Math.max(1, Math.round(c.dt * slowest * Math.pow(2, k / 2))) / slowest);
+  const series = A.conds.map(cd => ({
+    name: cd.name, color: cd.color,
+    pts: [...lags].map(t => [t, persistenceAt(cd.used, t)]).filter(p => isFinite(p[1]))
+  })).filter(s => s.pts.length);
   const fig = curveFig('Directional persistence vs sampling interval', series,
     `sampling interval (${c.tUnit})`, '⟨cos Δθ⟩ between consecutive steps', [{ v: c.dt, label: 'current Δt', color: '#7b57d6' }]);
-  fig.wideData = wideFromPts('directional_persistence', KEEP.series, `lag (${c.tUnit})`, 'direction correlation');
+  fig.wideData = wideFromPts('directional_persistence', series, `lag (${c.tUnit})`, 'direction correlation');
   return fig;
 }
 
@@ -4047,10 +4101,10 @@ function renderDiagnostics(A) {
     if (w.omega[i] != null || w.omega[i + 1] != null) defN++; } }));
   const steps = [];
   A.conds.forEach(cd => cd.used.forEach(w => { for (let i = 0; i < w.n - 1; i++)
-    if (w.speedSeries[i] != null) steps.push(w.speedSeries[i] * c.dt * c.K); }));
+    if (w.speedSeries[i] != null) steps.push(w.speedSeries[i] * w.dt * (w.scale || 1)); }));
   if (steps.length) { const q20 = S.quantile(steps, .2), pctKept = 100 * steps.filter(v => v >= c.minDisp).length / steps.length;
     if (pctKept < 60) notes.push(`<div class="note warn"><b>Only ${pctKept.toFixed(0)}% of Δt steps are longer than the minimum step (${fmt(c.minDisp)} px), so most of the track has no defined heading and Methods A and B will under-count badly.</b> These animals move ${fmt(S.median(steps), 2)} px per Δt on average. Lower the minimum step on the <i>Analysis settings</i> tab to about <b>${fmt(q20, 2)} px</b>, or raise Δt so the animal covers more ground per sample.</div>`); }
-  const pers = persistenceAt(A, c.dt * c.F);
+  const pers = persistenceAt(A.conds.flatMap(cd => cd.used), c.dt);
   if (isFinite(pers) && pers < .35) notes.push(`<div class="note warn"><b>Directional persistence at the current Δt is only ⟨cos Δθ⟩ = ${fmt(pers, 2)}.</b> Successive steps are close to uncorrelated, which means most of the measured turning is tracking noise and body undulation rather than navigation. Increase the smoothing window and/or Δt until the persistence curve below sits above roughly 0.5 at your chosen Δt — and check that the frame rate you entered is right, since everything scales with it.</div>`);
   const sug = robustThr(om, 3);
   if (isFinite(sug)) notes.push(`<div class="note">Data-driven starting point for Method A: <b>${fmt(sug)} deg ${c.tUnit === 's' ? 's' : 'frame'}⁻¹</b> (median + 3 robust SD of |ω|, bounded to the 80th–99.5th percentile of the observed distribution — roughly the point where the turning-rate distribution stops looking like ordinary run wobble). Treat it as a starting point to be confirmed visually, never as the answer. Note that |ω| can never exceed ${fmt(180 / c.dt)} deg ${c.tUnit === 's' ? 's' : 'frame'}⁻¹ at Δt = ${fmt(c.dt)}, so a threshold near that ceiling detects nothing.</div>`);
@@ -4461,7 +4515,8 @@ const PICKSRC = { on: false };
 const LANDMARK_PICKER = { fileId: null, key: 'src' };
 function hasPoint(p) { return Number.isFinite(p?.x) && Number.isFinite(p?.y); }
 function recordingPoints(f, c, sc) {
-  const scaled = p => hasPoint(p) ? { x: p.x / c.K, y: p.y / c.K } : null;
+  const K = recordingScale(f, c) || 1;
+  const scaled = p => hasPoint(p) ? { x: p.x / K, y: p.y / K } : null;
   return { start: scaled(f.start), source: scaled(f.src),
     centre: scaled(hasPoint(f.centre) ? f.centre : { x: sc.cx, y: sc.cy }) };
 }
@@ -4498,7 +4553,7 @@ function renderSrcTable(A) {
     host.innerHTML = '';
     host.dataset.sig = sig;
     const tbl = el('table');
-    tbl.innerHTML = '<thead><tr><th>Condition</th><th>Gradient</th><th>Recording</th><th>Start x (px)</th><th>Start y (px)</th><th>Goal x (px)</th><th>Goal y (px)</th><th>Centre x (px)</th><th>Centre y (px)</th><th></th></tr></thead>';
+    tbl.innerHTML = '<thead><tr><th>Condition</th><th>Gradient</th><th>Recording</th><th>FPS override</th><th>Reported px/mm</th><th>Start x (px)</th><th>Start y (px)</th><th>Goal x (px)</th><th>Goal y (px)</th><th>Centre x (px)</th><th>Centre y (px)</th><th></th></tr></thead>';
     const body = el('tbody');
     A.conds.forEach(cd => {
       const files = cd.files.length ? cd.files : [null];
@@ -4514,6 +4569,12 @@ function renderSrcTable(A) {
         }
         if (f) {
           row.appendChild(el('td', {}, f.name));
+          const fps = el('input', { type: 'number', min: '0', step: 'any', style: 'width:86px',
+            'data-fps': f.id, 'aria-label': 'Frame-rate override for ' + f.name });
+          fps.oninput = () => { f.fps = fps.valueAsNumber > 0 ? fps.valueAsNumber : null; schedule(); };
+          fps.onblur = () => { fps.value = f.fps ?? ''; };
+          row.appendChild(el('td', {}, fps));
+          row.appendChild(el('td', { class: 'n', 'data-reported-scale': f.id }));
           axes.forEach(([key, label]) => ['x', 'y'].forEach(axis => {
             const input = el('input', { type: 'number', step: 'any', style: 'width:80px',
               'data-point': f.id + '-' + key + '-' + axis, 'aria-label': label + ' ' + axis + ' for ' + f.name });
@@ -4538,19 +4599,36 @@ function renderSrcTable(A) {
               schedule();
             } }, 'Copy to condition')
           ]));
-        } else row.appendChild(el('td', { colspan: '8' }, 'No files loaded'));
+        } else row.appendChild(el('td', { colspan: '10' }, 'No files loaded'));
         body.appendChild(row);
       });
     });
     tbl.appendChild(body);
     host.appendChild(tbl);
   }
+  const medianScale = S.median(reportedScales(A.conds));
   A.conds.forEach(cd => {
     host.querySelector(`select[data-cond="${cd.id}"]`).value = cd.grad || 'yes';
-    cd.files.forEach(f => axes.forEach(([key]) => ['x', 'y'].forEach(axis => {
-      const input = host.querySelector(`input[data-point="${f.id}-${key}-${axis}"]`);
-      if (input !== document.activeElement) input.value = Number.isFinite(f[key]?.[axis]) ? f[key][axis] : '';
-    })));
+    cd.files.forEach(f => {
+      const fps = host.querySelector(`input[data-fps="${f.id}"]`);
+      const inherited = recordingFrameRate({ meta: f.meta }, A.c.fps);
+      if (fps !== document.activeElement) fps.value = f.fps ?? '';
+      fps.placeholder = inherited ?? 'Enter FPS';
+      fps.title = f.meta?.fps > 0 ? 'Blank uses file rate' : inherited ? 'Blank uses fallback rate' : 'No frame rate provided';
+      const cell = host.querySelector(`td[data-reported-scale="${f.id}"]`);
+      const scale = reportedScale(f);
+      const effectiveScale = recordingScale(f, A.c);
+      cell.textContent = scale === null ? '—' : fmt(scale, 3);
+      cell.title = effectiveScale ? `Scale used for analysis: ${fmt(effectiveScale, 3)} px/mm` : 'No spatial scale in use';
+      if (scale !== null && Math.abs(scale - medianScale) > SCALE_TOLERANCE + 1e-9) {
+        cell.append(' ', el('span', { class: 'pill warn', title: `Median ${fmt(medianScale, 3)} px/mm` },
+          scale > medianScale ? 'High' : 'Low'));
+      }
+      axes.forEach(([key]) => ['x', 'y'].forEach(axis => {
+        const input = host.querySelector(`input[data-point="${f.id}-${key}-${axis}"]`);
+        if (input !== document.activeElement) input.value = Number.isFinite(f[key]?.[axis]) ? f[key][axis] : '';
+      }));
+    });
   });
   renderLandmarkPicker(A);
 }
@@ -4559,6 +4637,7 @@ function renderLandmarkPicker(A) {
   host.innerHTML = '';
   const f = A?.conds.flatMap(cd => cd.files).find(file => file.id === LANDMARK_PICKER.fileId);
   if (!f) return;
+  const scale = recordingScale(f, A.c);
   const points = recordingPoints(f, A.c, A.sc);
   const tracks = A.conds.flatMap(cd => cd.used).filter(w => w.fileId === f.id);
   const xs = [], ys = [];
@@ -4572,16 +4651,16 @@ function renderLandmarkPicker(A) {
     el('button', { class: 'btn sm', onclick: () => { LANDMARK_PICKER.fileId = null; host.innerHTML = ''; } }, 'Close')
   ]));
   const dom = [xs, ys].map(v => {
-    if (!v.length) return [0, A.c.hasSpace ? A.sc.plateDia : 100];
-    const lo = minOf(v), hi = maxOf(v), pad = A.c.hasSpace ? Math.max((hi - lo) * .12, A.sc.plateDia / 2) : Math.max((hi - lo) / 2, 50);
+    if (!v.length) return [0, scale ? A.sc.plateDia : 100];
+    const lo = minOf(v), hi = maxOf(v), pad = scale ? Math.max((hi - lo) * .12, A.sc.plateDia / 2) : Math.max((hi - lo) / 2, 50);
     return [lo - pad, hi + pad];
   });
   const fig = trackFig(f.name, tracks, dom, { size: 500, equal: true, flipY: $('axFlipY').checked,
-    sUnit: A.c.sUnit, markers: markerCfg(), source: points.source, starts: [points.start].filter(Boolean),
+    sUnit: scale ? 'mm' : 'px', markers: markerCfg(), source: points.source, starts: [points.start].filter(Boolean),
     centres: [points.centre].filter(Boolean) });
   host.appendChild(figCard('landmark_' + f.id, fig, 'Click the plot to save the selected landmark for this recording.', {
     pickPoint: (x, y) => {
-      f[LANDMARK_PICKER.key] = { x: +(x * A.c.K).toFixed(2), y: +(y * A.c.K).toFixed(2) };
+      f[LANDMARK_PICKER.key] = { x: +(x * (scale || 1)).toFixed(2), y: +(y * (scale || 1)).toFixed(2) };
       clearGradientMapZoom();
       schedule();
     }
@@ -4630,7 +4709,9 @@ function bearingBinComparisons(groups) {
 function renderBearing(withNav, c, grid, panel) {
   const rateCfg = bearingRateConfig(c);
   const ylab = rateLabel(rateCfg);
+  const slopeLabel = `Slope (${ylab} per unit cos θ)`;
   const byPlate = c.nUnit === 'file';
+  const overlay = byPlate && c.wormOverlay;
   const groups = withNav.map(({ cd, ws }) => {
     const worms = ws.filter(w => c.primary !== 'C' || w.hasCL);
     return { cd, worms, plates: plateBearingRates(worms, rateCfg) };
@@ -4644,14 +4725,23 @@ function renderBearing(withNav, c, grid, panel) {
   const binRows = [['Condition', 'Plate file', 'Plate ID', 'cos θ from', 'cos θ to', 'Bin center',
     'Reorientation starts', `Valid heading time (${c.tUnit} summed across worms)`, ylab]];
   const slopeRows = [['Condition', 'Plate file', 'Plate ID', 'Worms analyzed', 'Bins fitted',
-    `Slope (${ylab} per unit cos θ)`, `Intercept (${ylab})`, 'R²']];
+    slopeLabel, `Intercept (${ylab})`, 'R²']];
   groups.forEach(({ cd, plates }) => plates.forEach(p => {
     p.bins.forEach(b => binRows.push([cd.name, p.file, p.fileId, b.x0, b.x1, b.mid, b.n, b.time, b.mean]));
-    slopeRows.push([cd.name, p.file, p.fileId, p.wormCount, p.fit.n, p.fit.slope, p.fit.intercept, p.fit.r2]);
+    slopeRows.push([cd.name, p.file, p.fileId, p.worms.length, p.fit.n, p.fit.slope, p.fit.intercept, p.fit.r2]);
   }));
+  const slopeGroups = groups.map(({ plates }, i) => {
+    const entries = plates.map(({ file, fileId, fit, worms }) => ({ file, fileId, fit, value: fit.slope,
+      worms: worms.map(w => ({ worm: w.id, dur: w.durT, value: w.nav.fit.slope, fit: w.nav.fit })) }));
+    const background = overlay ? entries.flatMap(p => p.worms.map(w => w.value)).filter(Number.isFinite) : [];
+    return { ...series[i], entries, background };
+  });
   const binCSV = { name: 'bearing_plate_bins', rows: binRows };
-  const slopeCSV = { name: 'bearing_plate_slopes', rows: slopeRows };
+  const slopeCSV = metricReplicateTable('bearing_slope_plates_and_worms', slopeGroups, slopeLabel, c.tUnit, [
+    ['Bins fitted', e => e.fit.n], [`Intercept (${ylab})`, e => e.fit.intercept], ['R²', e => e.fit.r2]
+  ]);
   ST.tables[binCSV.name] = binCSV;
+  ST.tables.bearing_plate_slopes = { name: 'bearing_plate_slopes', rows: slopeRows };
   ST.tables[slopeCSV.name] = slopeCSV;
   ST.tables.bearing_bins = { name: 'bearing_bins', rows: [
     ['Condition', 'cos θ from', 'cos θ to', 'n', 'Mean rate', 'SEM', '95% CI lower', '95% CI upper', 'Fitted rate'],
@@ -4665,13 +4755,19 @@ function renderBearing(withNav, c, grid, panel) {
     timeCourseFig('Reorientation rate vs bearing to the source', series, 'bearing to source, cos θ (+1 = toward the source)', ylab, 'fit', null),
     `${caption} Points show mean ± pointwise 95% CI across ${unit}s. Dashed lines average the fitted ${unit} regressions.`,
     { wide: wideFromSeries('bearing_turn_rate', series, 'cos theta', true), csv: binCSV, csvLabel: 'Plate bins CSV' }));
-  const slopeGroups = series.filter(s => s.values.length);
-  if (slopeGroups.length) {
-    panel('bearing_slope', 'Turn-rate vs bearing slope', null, `slope (${ylab} per unit cos θ)`,
-      `One least-squares slope per ${unit} with at least three eligible bins. Positive slopes mean more reorientations while heading toward the source.`,
-      { groups: slopeGroups, platePoints: byPlate, csv: slopeCSV, csvLabel: 'Plate slopes CSV' });
+  const fittedGroups = slopeGroups.filter(s => s.values.length);
+  const csvLabel = 'Plate & worm CSV';
+  if (fittedGroups.length) {
+    const dots = byPlate ? (overlay ? 'Large dots are plate fits. Faint dots are worm fits.' : 'Each dot is a plate fit.')
+      : 'Each dot is a worm fit.';
+    panel('bearing_slope', 'Turn-rate vs bearing slope', null, slopeLabel,
+      `One least-squares slope per ${unit} with at least three eligible bins. ${dots} Positive slopes mean more reorientations while heading toward the source.`,
+      { groups: fittedGroups, platePoints: byPlate, csv: slopeCSV, csvLabel });
   } else {
-    grid.appendChild(el('div', { class: 'empty' }, `A slope requires at least three eligible bearing bins per ${unit}.`));
+    grid.appendChild(el('div', { class: 'empty' }, [
+      el('p', {}, `A slope requires at least three eligible bearing bins per ${unit}.`),
+      figureCsvButton(slopeCSV, csvLabel)
+    ]));
   }
   return c.navBinTests ? bearingBinComparisons(groups) : '';
 }
@@ -4820,7 +4916,7 @@ function renderRoam(A) {
 function saltPreviewSpot(sc) {
   const d = sc.plateDia, c = cfg(), rotate = $('alignCue').checked;
   const points = ST.conds.filter(cd => cd.grad !== 'off').flatMap(cd => cd.files)
-    .map(f => recordingPoints(f, c, sc)).filter(p => p.source && p.centre);
+    .filter(f => recordingScale(f, c)).map(f => recordingPoints(f, c, sc)).filter(p => p.source && p.centre);
   const mean = meanPoint(points.map(p =>
     pointTransform({ ...p, start: null }, p.centre, rotate)(p.source.x, p.source.y)));
   if (c.navMode === 'point' && c.hasSpace && mean) return { x: d / 2 + mean.x, y: d / 2 + mean.y, count: points.length };
@@ -4909,7 +5005,7 @@ function saltSetupCard(c, where) {
 
   /* ---- 1. the scale ---- */
   box.appendChild(row(c.hasSpace, 'Pixels per millimetre',
-    c.hasSpace ? `set to ${c.pxmm} px/mm — distances are in millimetres`
+    c.hasSpace ? `Distance in millimetres (${spatialScaleSummary(c)})`
       : 'without this the app works in pixels, and a pixel has no concentration'));
   if (!c.hasSpace) {
     const pxInp = el('input', { type: 'number', step: 'any', min: '0', style: 'width:120px', placeholder: 'px per mm' });
@@ -4935,7 +5031,7 @@ function saltSetupCard(c, where) {
     document.querySelector('.nav button[data-tab="data"]').click();
   } }, 'Set recording landmarks in Data & groups'));
   if (!c.hasTime) box.appendChild(el('div', { class: 'note',
-    html: 'No frame rate is set, so rates and dC/dt will be expressed per frame rather than per second. That is fine for comparing conditions recorded on the same rig; set a frame rate on <b>Analysis settings</b> if you want real units.' }));
+    html: 'Time is in frames. Enter frame rates in <b>Data &amp; groups</b> to use seconds and model how the field changes during recording.' }));
   if (where === 'resp') box.appendChild(el('div', { class: 'row' }, [
     el('button', { class: 'btn sm', onclick: () => document.querySelector('.nav button[data-tab="salt"]').click() }, 'Check the gradient parameters →')]));
   return box;
@@ -5114,15 +5210,36 @@ function renderGradMap(A) {
     sources: cd.files.map(f => projectedSources.get(f.id)).filter(Boolean),
     used: cd.used.filter(w => projects.has(w.fileId)).map(w => mapTracks(w, projects.get(w.fileId)))
   })).filter(cd => cd.used.length);
+  const mapPanels = layout === 'recording' ? mapGroups.flatMap(cd => {
+    const wormsByFile = new Map();
+    cd.used.forEach(w => {
+      if (!wormsByFile.has(w.fileId)) wormsByFile.set(w.fileId, []);
+      wormsByFile.get(w.fileId).push(w);
+    });
+    return cd.files.filter(f => wormsByFile.has(f.id)).map(recording => ({
+      ...cd, id: cd.id + '_' + recording.id, name: cd.name + ' — ' + recording.name.split(/[\\/]/).at(-1),
+      sources: [projectedSources.get(recording.id)], used: wormsByFile.get(recording.id), recording
+    }));
+  }) : mapGroups;
+  const goalCaption = cd => {
+    if (cd.sources.length > 1) return 'Field centred on the mean goal across these recordings.';
+    const f = cd.recording || cd.files.find(f => projectedSources.has(f.id));
+    const { centre, source } = files.get(f.id);
+    const distance = centre ? ` (${fmt(Math.hypot(source.x - centre.x, source.y - centre.y), 2)} mm from the plate centre)` : '';
+    return `Salt peak at Goal x=${fmt(f.src.x, 4)}, y=${fmt(f.src.y, 4)} px${distance}.`;
+  };
   const [xd, yd] = domainOf(mapGroups.flatMap(cd => cd.used), [...projectedSources.values()], false);
   const when = $('gmAt').value;
   const durs = A.rows.map(r => r.dur).filter(isFinite);
   const span = durs.length ? S.median(durs) : 0;
-  const tAdd = sc.live ? (when === 'mid' ? span / 2 : when === 'end' ? span : 0) : 0;
+  const tAdd = sc.live && c.hasTime ? (when === 'mid' ? span / 2 : when === 'end' ? span : 0) : 0;
   const mark = $('gmMarks').checked, M = markerCfg();
   const showRing = $('gmRing').checked;
   const plate = anchor === 'centre' && (fullPlate || showRing)
     ? { cx: 0, cy: 0, dia: sc.plateDia, ring: showRing ? sc.ring : 0 } : null;
+  const rimLabel = plate ? `Solid rim diameter ${plate.dia} mm. ` : '';
+  const ringLabel = plate?.ring > 0 ? `Dashed worm-placement ring radius ${plate.ring} mm. ` : '';
+  $('gmGeometryNote').textContent = rimLabel + ringLabel + 'The red marker is the salt peak.';
   const base = { sc: gsc, size, equal: true, flipY: $('axFlipY').checked, sUnit: c.sUnit, scale,
     rampName: gsc.rampName, contour: $('gmContour').checked, labels: $('gmLabels').checked,
     halo: $('gmHalo').checked, cbar: $('gmCbar').checked, markers: M, plate, fullPlate, tAdd,
@@ -5179,7 +5296,7 @@ function renderGradMap(A) {
           { wideData: wideFromTracks(`gradient_map_${safeName(cd.name)}_${w.fileId}_worm_${w.id}`, [{ cond: cd.name, w, ev: evOf(w) }], coordinateLabel) }),
         w.salt ? `mean ${fmt(w.salt.meanC, 3)} mM · ${fmt(w.salt.startC, 3)} → ${fmt(w.salt.endC, 3)} mM · closest approach ${fmt(w.salt.minR, 3)} mm` : ''))); });
   } else {
-    mapGroups.forEach(cd => { if (!cd.used.length) return;
+    mapPanels.forEach(cd => { if (!cd.used.length) return;
       const spot = meanPoint(cd.sources);
       const trs = cd.used.map(w => mkTrack(w, cd.color));
       const mc = cd.used.map(w => w.salt ? w.salt.meanC : NaN).filter(isFinite);
@@ -5187,19 +5304,20 @@ function renderGradMap(A) {
         fieldTrackFig(cd.name + ' on the salt field' + (cd.grad === 'no' && !/no.?gradient/i.test(cd.name) ? ' (no gradient)' : ''), trs, [xd, yd],
           { ...base, source: spot, sources: cd.sources, note, wideData: null }),
         `${cd.used.length} worms` + (mc.length ? ` · mean salt experienced ${fmt(S.mean(mc), 3)} mM` : '') +
-        (cd.grad === 'no' ? ' · this plate had no gradient; the field shown is where it would have been' : ''),
+        '. ' + goalCaption(cd) +
+        (cd.grad === 'no' ? ' This field shows the control’s reference goal.' : ''),
         { wide: wideFromTracks('gradient_map_' + safeName(cd.name),
             cd.used.map(w => ({ cond: cd.name, w, ev: evOf(w) })), coordinateLabel) })); });
-    if ($('gmReo').checked) mapGroups.forEach(cd => { if (!cd.used.length) return;
+    if ($('gmReo').checked) mapPanels.forEach(cd => { if (!cd.used.length) return;
       const spot = meanPoint(cd.sources);
       reoPanels.push(figCard('reorientations_on_field_' + cd.id,
         fieldTrackFig(cd.name + ' — reorientations on the salt field', [mkMarksOnly(cd.used, cd.color)], [xd, yd],
           { ...base, source: spot, sources: cd.sources, note, markers: markerFor(cd.color), halo: false, colorByBearing }),
-        reoCap(cd.used), { wide: wideFromEventList('reorientations_on_field_' + safeName(cd.name),
+        reoCap(cd.used) + '. ' + goalCaption(cd), { wide: wideFromEventList('reorientations_on_field_' + safeName(cd.name),
           cd.used.map(w => ({ cond: cd.name, w, ev: evOf(w) }))) })); });
   }
-  host.appendChild(el('div', { class: 'note' },
-    'In an overlay, the filled marker and shading use the mean goal. Open circles mark individual goals. Salt exposure uses each recording’s own goal.'));
+  if (layout !== 'recording') host.appendChild(el('div', { class: 'note' },
+    'Pooled fields use the mean goal. Open circles mark individual goals. Use one panel per recording to see each recording’s salt peak.'));
   host.appendChild(grid);
   if (reoPanels.length) { const g2 = el('div', { class: 'figgrid' });
     reoPanels.forEach(p => g2.appendChild(p));
@@ -5562,7 +5680,8 @@ $('zipAll').onclick = async () => {
     /* The original uploads, filed under their condition, plus the manifest and project
        description that let the whole thing be opened again and reproduce these numbers. */
     const withSource = $('zipSource').checked;
-    const manifest = [['Condition', 'Gradient', 'Kind', 'File in archive', 'Original name', 'Worms', 'Rows', 'Centerlines', 'Start x (px)', 'Start y (px)', 'Cue x (px)', 'Cue y (px)', 'Centre x (px)', 'Centre y (px)', 'Status']];
+    const calibration = cfg();
+    const manifest = [['Condition', 'Gradient', 'Kind', 'File in archive', 'Original name', 'Worms', 'Rows', 'Centerlines', 'Start x (px)', 'Start y (px)', 'Cue x (px)', 'Cue y (px)', 'Centre x (px)', 'Centre y (px)', 'Effective FPS', 'Effective scale (px/mm)', 'Status']];
     const project = { app: 'Worm Track Analyzer', format: 1, generated: new Date().toISOString(),
       settings: settingsObj(), conditions: [] };
     let missing = 0;
@@ -5581,12 +5700,13 @@ $('zipAll').onclick = async () => {
           const r = it.rec;
           const row = [cd.name, cd.grad || 'yes', it.kind, path, it.name,
             r ? r.worms.length : '', r ? r.nRows : '', r ? (r.hasCenterlines ? 'yes' : 'no') : '',
-            r?.start?.x, r?.start?.y, r?.src?.x, r?.src?.y, r?.centre?.x, r?.centre?.y, 'included'];
+            r?.start?.x, r?.start?.y, r?.src?.x, r?.src?.y, r?.centre?.x, r?.centre?.y,
+            r ? recordingFrameRate(r, calibration.fps) : '', r ? recordingScale(r, calibration) : '', 'included'];
           try {
             if (!it.blob) throw new Error('no copy of this file is held');
             files.push({ name: path, data: await blobBytes(it.blob) });
             (it.kind === 'tracks' ? pc.files : pc.extras).push({ path, originalName: it.name,
-              start: r?.start || null, source: r?.src || null, centre: r?.centre || null, pxmm: r?.meta?.pxmm });
+              start: r?.start || null, source: r?.src || null, centre: r?.centre || null, pxmm: r?.meta?.pxmm, fps: r?.fps, metadataFPS: r?.meta?.fps });
           } catch (e) { row[3] = ''; row[row.length - 1] = 'could not be re-read: ' + e.message; missing++; }
           manifest.push(row);
         }
@@ -5622,8 +5742,8 @@ $('zipAll').onclick = async () => {
       'analysis_settings.json   every threshold and option used',
       '',
       'Settings that produced these figures:',
-      `  frame rate            ${c.fps ? c.fps + ' fps' : 'not set — results are in frames'}`,
-      `  spatial scale         ${c.pxmm ? c.pxmm + ' px/mm' : 'not set — results are in pixels'}`,
+      `  frame rates           ${frameRateSummary(c)}`,
+      `  spatial scale         ${spatialScaleSummary(c)}`,
       `  smoothing             ${c.smoothMethod === 'sg' ? `Savitzky-Golay, window ${c.smoothWin} frames, order ${c.sgOrder}`
         : c.smoothMethod === 'none' ? 'none' : `moving average, window ${c.smoothWin} frames`}`,
       `  sampling interval dt  ${c.dt} ${c.tUnit}`,
@@ -5657,6 +5777,7 @@ $('zipAll').onclick = async () => {
 /* ---- reopening an exported project ---- */
 let RESTORING = false;
 function applySettings(o) {
+  if (!('scaleMode' in o)) $('scaleMode').value = 'shared';
   Object.entries(o).forEach(([k, v]) => { if (k.startsWith('__')) return;
     const n = $(k); if (!n) return;
     if (n.type === 'checkbox') n.checked = !!v; else n.value = v;
@@ -5699,6 +5820,8 @@ async function openProjectZip(file) {
           ? await ingestWorkbook(pf.originalName || base, blob)
           : ingestCSV(pf.originalName || base, new TextDecoder().decode(bytes));
         rec.blob = blob;
+        if (Number.isFinite(pf.metadataFPS) && pf.metadataFPS > 0) rec.meta.fps = pf.metadataFPS;
+        if (Number.isFinite(pf.fps) && pf.fps > 0) rec.fps = pf.fps;
         if (Number.isFinite(pf.pxmm) && pf.pxmm > 0) rec.meta.pxmm = pf.pxmm;
         if (pf.start) rec.start = { ...pf.start };
         if (pf.source) rec.src = { ...pf.source };
@@ -5739,7 +5862,7 @@ function settingsObj() { const o = {}; document.querySelectorAll('input,select')
   o[n.id] = n.type === 'checkbox' ? n.checked : n.value; });
   o.__autoScale = !TOUCHED.has('pxmm');
   o.__quality = [...ST.qualOn]; o.__conditions = ST.conds.map(c => ({ name: c.name, color: c.color, gradient: c.grad || 'yes',
-    files: c.files.map(f => ({ name: f.name, start: f.start || null, source: f.src || null, centre: f.centre || null })) }));
+    files: c.files.map(f => ({ name: f.name, start: f.start || null, source: f.src || null, centre: f.centre || null, fps: f.fps ?? null })) }));
   o.__generated = new Date().toISOString(); return o; }
 $('saveCfg').onclick = () => saveBlob(new Blob([JSON.stringify(settingsObj(), null, 2)], { type: 'application/json' }), 'worm_analysis_settings.json');
 $('loadCfgBtn').onclick = () => $('loadCfg').click();
@@ -5757,6 +5880,7 @@ $('loadCfg').onchange = async () => { const f = $('loadCfg').files[0]; if (!f) r
         const j = files.findIndex(file => file.name === record.name);
         if (j < 0) return;
         const [landmarks] = files.splice(j, 1);
+        if ('fps' in landmarks) record.fps = landmarks.fps;
         if ('start' in landmarks) record.start = landmarks.start;
         if ('source' in landmarks) record.src = landmarks.source;
         if ('centre' in landmarks) record.centre = landmarks.centre;
@@ -5799,7 +5923,7 @@ function renderMethods() {
 <p class="mono" style="font-size:11.5px;color:var(--ink-3)">Currently: ${c.smoothMethod === 'sg' ? `Savitzky–Golay, window ${c.smoothWin} frames, order ${c.sgOrder}` : c.smoothMethod === 'none' ? 'no smoothing' : `moving average, window ${c.smoothWin} frames`}.</p>
 
 <h3>Step 2 — the track is re-sampled at Δt</h3>
-<p>The cleaned path is interpolated onto a regular grid with spacing Δt = <b>${fmt(c.dt)} ${T}</b> (${fmt(c.dt * c.F, 1)} frames). Every heading, turning rate and speed below is computed on this grid. Δt sets the timescale of the analysis and is the parameter that most changes the answer: sample too finely and body bends dominate; sample too coarsely and genuine turns are averaged out. Where consecutive valid points are more than 2.5·Δt apart the series is left broken rather than interpolated across the gap.</p>
+<p>The cleaned path is interpolated onto a regular grid with spacing Δt = <b>${fmt(c.dt)} ${T}</b>. At each recording’s rate the grid is spaced by at least one frame. Every heading, turning rate and speed below is computed on this grid. Δt sets the timescale of the analysis and is the parameter that most changes the answer: sample too finely and body bends dominate; sample too coarsely and genuine turns are averaged out. Where consecutive valid points are more than 2.5·Δt apart the series is left broken rather than interpolated across the gap.</p>
 <p>Between consecutive grid points <code>i</code> and <code>i+1</code> the displacement vector <b>d</b><sub>i</sub> defines the heading:</p>
 <div class="eq">θ_i = atan2(y_{i+1} − y_i ,  x_{i+1} − x_i)</div>
 <p>A heading is only defined when the animal actually moved at least <b>${fmt(c.minDisp)} px</b> during the interval; otherwise the direction of a near-stationary centroid is noise.</p>

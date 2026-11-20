@@ -28,6 +28,16 @@ When recorded scales span at most 5 pixels/mm, the app averages their pixel size
 and converts the mean into one scale for all conditions. A manually entered scale overrides
 automatic averaging.
 
+Under **Data & groups → Calibration → Spatial calibration**, select **Use each recording’s
+reported scale** to convert each video’s tracks and landmarks to millimetres using its own
+metadata. A fallback scale applies only to recordings without metadata. If calibrated and
+uncalibrated recordings are loaded together, the app lists which recordings need a scale.
+
+In **Data & groups**, each recording’s **FPS override** takes precedence over its file metadata
+and the shared fallback frame rate. Recordings with known rates are compared in seconds. If some
+rates are missing, those recordings are excluded from the analysis until a rate is provided.
+When all rates are missing, analysis uses frames.
+
 ---
 
 ## Input formats
@@ -76,7 +86,8 @@ Kruskal–Wallis with Holm-adjusted post hoc comparisons for three or more.
 **Bearing.** In plate mode, each bin rate is the number of reorientation starts divided by the
 total valid heading time across worms on that plate. The rate curve shows the plate mean and
 pointwise 95% confidence intervals. Each plate with at least three occupied bins contributes
-one regression slope. Optional per-bin plate comparisons use Holm-adjusted p-values.
+one regression slope. The slope plot can overlay individual worm fits as faint dots. Optional
+per-bin plate comparisons use Holm-adjusted p-values.
 
 **No-gradient controls.** Mark a condition as *No gradient* and it is not skipped — it goes through
 identical code against the position the cue would have occupied. Every navigation and salt measure is
@@ -109,9 +120,11 @@ The **Mark on plot** control edits one recording at a time. Tracks align to the 
 when available and otherwise to each worm’s first position. Whole-plate maps align recording centres
 using the diameter under **Salt gradient**. Recordings with missing centres are listed and can
 be viewed in **Track region**.
-Rotation uses the centre-to-goal axis for plate-aligned maps. Overlay shading uses the mean
-goal and open circles show individual goals. Salt and bearing calculations use the original
-recording coordinates.
+Rotation uses the centre-to-goal axis for plate-aligned maps. **One panel per recording**
+centres each field on that recording’s goal, imported as the **End Point** in Excel. Pooled
+maps centre the field on the mean goal and show individual goals as open circles. The solid
+rim is the plate boundary. The dashed ring marks the worm-placement radius in millimetres.
+Salt and bearing calculations use the original recording coordinates.
 
 On **Gradient map**, **Reorientation colour → By bearing (Viridis)** colours reorientation
 starts by the bearing just before the turn, from −1 (away from the goal) to +1 (toward it).
@@ -130,9 +143,10 @@ is also a map of where the animal was — which is what the no-gradient control 
 Everything the app shows can leave it.
 
 - **Per figure** — `CSV` provides wide-format data with separate columns for each condition.
-  `Plate & worm CSV` on the runs, total distance, and overall reorientation plots groups rows by
-  condition and plate. `Plate bins CSV` on the bearing curve includes counts and exposure
-  time, and `Plate slopes CSV` identifies the slope and fit coverage for each plate.
+  `Plate & worm CSV` on the runs, total distance, overall reorientation, and bearing slope plots
+  lists each plate followed by its worms. Filter the `Unit` column to select either level.
+  The slope export includes fit coverage for both levels and leaves unavailable slopes blank.
+  `Plate bins CSV` on the bearing curve includes counts and exposure time.
   Figures are also available as `SVG`, `PNG`, and `PDF`.
 - **`csv/`** — every table in long format, one file each, for scripting.
 - **`wide/column/`** — one column per condition, one row per replicate. Paste into GraphPad Prism as
